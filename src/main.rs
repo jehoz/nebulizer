@@ -4,11 +4,13 @@ use rodio::source::Buffered;
 use rodio::{source::Source, Decoder, OutputStream, OutputStreamHandle, Sink};
 use std::fs::File;
 use std::io::BufReader;
+use std::time::Duration;
 
 type AudioSource = Buffered<Decoder<BufReader<File>>>;
 
 struct AudioFile {
     name: String,
+    size: usize,
     source: AudioSource,
 }
 
@@ -17,6 +19,10 @@ struct NebulizerApp {
     sink: Sink,
 
     audio_file: Option<AudioFile>,
+    playing: bool,
+
+    grain_start_position: f32,
+    grain_size: u32,
 }
 
 impl NebulizerApp {
@@ -26,6 +32,10 @@ impl NebulizerApp {
             sink,
 
             audio_file: None,
+            playing: false,
+
+            grain_start_position: 0.0,
+            grain_size: 20,
         }
     }
 }
@@ -54,6 +64,7 @@ impl eframe::App for NebulizerApp {
                     if let Some(source) = load_audio_file(path.display().to_string()) {
                         self.audio_file = Some(AudioFile {
                             name: path.display().to_string(),
+                            size: source.clone().count(),
                             source,
                         })
                     } else {
@@ -69,15 +80,47 @@ impl eframe::App for NebulizerApp {
                 }
                 Some(file) => {
                     ui.monospace(&file.name);
-                    if ui.button("Play").clicked() {
-                        self.sink.stop();
+                    ui.horizontal(|ui| {
+                        if ui.button("Play").clicked() {
+                            self.playing = true;
+                        }
 
-                        let source = file.source.clone();
-                        self.sink.append(source);
-                    }
+                        if ui.button("Stop").clicked() {
+                            self.sink.stop();
+                            self.playing = false;
+                        }
+                    });
 
-                    if ui.button("Stop").clicked() {
-                        self.sink.stop();
+                    ui.horizontal(|ui| {
+                        ui.label("Start position");
+                        ui.add(
+                            egui::Slider::new(&mut self.grain_start_position, 0.0..=100.0)
+                                .suffix("%"),
+                        );
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.label("Grain size");
+                        ui.add(egui::Slider::new(&mut self.grain_size, 10..=100).suffix("ms"));
+                    });
+                }
+            }
+
+            if self.playing {
+                if let Some(file) = &self.audio_file {
+                    if self.sink.empty() {
+                        let start_time: Duration = Duration::from_millis(
+                            ((self.grain_start_position * file.size as f32)
+                                / file.source.sample_rate() as f32)
+                                as u64,
+                        );
+
+                        let grain = file
+                            .source
+                            .clone()
+                            .skip_duration(start_time)
+                            .take_duration(Duration::from_millis(self.grain_size as u64));
+                        self.sink.append(grain);
                     }
                 }
             }
