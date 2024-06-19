@@ -1,10 +1,9 @@
-use std::f32::consts::PI;
-use std::time::Duration;
-
 use rodio::{
     source::{SkipDuration, TakeDuration},
     Sample, Source,
 };
+use std::f32::consts::PI;
+use std::time::Duration;
 
 pub struct Grain<I> {
     input: TakeDuration<SkipDuration<I>>,
@@ -19,7 +18,7 @@ where
     I: Clone + Source,
     I::Item: Sample,
 {
-    fn new(input: I, start: Duration, size: Duration, envelope: f32) -> Grain<I> {
+    pub fn new(input: I, start: Duration, size: Duration, envelope: f32) -> Grain<I> {
         let grain = input.clone().skip_duration(start).take_duration(size);
 
         Grain {
@@ -28,6 +27,10 @@ where
             elapsed_ns: 0.0,
             envelope: envelope.clamp(0.0, 1.0),
         }
+    }
+
+    pub fn done_playing(self) -> bool {
+        self.elapsed_ns >= self.size_ns
     }
 }
 
