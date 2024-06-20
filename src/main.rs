@@ -82,7 +82,7 @@ impl eframe::App for NebulizerApp {
 
             ui.horizontal(|ui| {
                 ui.label("Overlap");
-                ui.add(egui::Slider::new(&mut settings.overlap, 0.0..=1.0));
+                ui.add(egui::Slider::new(&mut settings.overlap, 0.0..=0.99));
             });
         });
     }

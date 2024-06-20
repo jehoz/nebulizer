@@ -15,9 +15,9 @@ impl Default for EmitterSettings {
     fn default() -> Self {
         EmitterSettings {
             position: 0.0,
-            grain_size_ms: 25.0,
-            envelope: 0.5,
-            overlap: 0.0,
+            grain_size_ms: 75.0,
+            envelope: 0.75,
+            overlap: 0.5,
         }
     }
 }
