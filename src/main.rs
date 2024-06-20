@@ -74,6 +74,16 @@ impl eframe::App for NebulizerApp {
                 ui.label("Grain size");
                 ui.add(egui::Slider::new(&mut settings.grain_size_ms, 1.0..=1000.0).suffix("ms"));
             });
+
+            ui.horizontal(|ui| {
+                ui.label("Envelope");
+                ui.add(egui::Slider::new(&mut settings.envelope, 0.0..=1.0));
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Overlap");
+                ui.add(egui::Slider::new(&mut settings.overlap, 0.0..=1.0));
+            });
         });
     }
 }
