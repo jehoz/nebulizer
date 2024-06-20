@@ -18,7 +18,7 @@ where
     I: Clone + Source,
     I::Item: Sample,
 {
-    pub fn new(input: I, start: Duration, size: Duration, envelope: f32) -> Grain<I> {
+    pub fn new(input: &I, start: Duration, size: Duration, envelope: f32) -> Grain<I> {
         let grain = input.clone().skip_duration(start).take_duration(size);
 
         Grain {
@@ -29,7 +29,7 @@ where
         }
     }
 
-    pub fn done_playing(self) -> bool {
+    pub fn done_playing(&self) -> bool {
         self.elapsed_ns >= self.size_ns
     }
 }
