@@ -1,6 +1,7 @@
 use std::error::Error;
 
 use midir::MidiInput;
+use midly::{live::LiveEvent, MidiMessage};
 
 pub fn run() -> Result<(), Box<dyn Error>> {
     let midi_in = MidiInput::new("nebulizer midi input")?;
@@ -31,8 +32,20 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     let _conn = midi_in.connect(
         in_port,
         "nebulizer-input-port",
-        move |stamp, msg, _| {
-            println!("{}: {:?} (len = {})", stamp, msg, msg.len());
+        move |_stamp, msg, _| {
+            let event = LiveEvent::parse(msg).unwrap();
+            match event {
+                LiveEvent::Midi { channel, message } => match message {
+                    MidiMessage::NoteOn { key, .. } => {
+                        println!("CH{}: Note {} down", channel, key)
+                    }
+                    MidiMessage::NoteOff { key, .. } => {
+                        println!("CH{}: Note {} up", channel, key)
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
         },
         (),
     );
