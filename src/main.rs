@@ -9,6 +9,7 @@ use std::time::Duration;
 
 mod emitter;
 mod grain;
+mod midi;
 
 use emitter::{Emitter, EmitterSettings};
 
@@ -22,6 +23,11 @@ struct NebulizerApp {
 }
 
 fn main() {
+    match midi::run() {
+        Ok(_) => (),
+        Err(err) => println!("FUCK {}", err),
+    }
+
     // initialize audio output stream
     let (_stream, stream_handle) = OutputStream::try_default().unwrap();
     let sink = Sink::try_new(&stream_handle).unwrap();
