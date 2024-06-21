@@ -1,5 +1,6 @@
+use midly::{num::u7, MidiMessage};
 use rodio::{Sample, Source};
-use std::time::Duration;
+use std::{sync::mpsc::Receiver, time::Duration};
 
 use crate::grain::Grain;
 
@@ -9,6 +10,7 @@ pub struct EmitterSettings {
     pub grain_size_ms: f32,
     pub envelope: f32,
     pub overlap: f32,
+    pub transpose: i32,
 }
 
 impl Default for EmitterSettings {
@@ -18,8 +20,20 @@ impl Default for EmitterSettings {
             grain_size_ms: 75.0,
             envelope: 0.75,
             overlap: 0.5,
+            transpose: 0,
         }
     }
+}
+
+struct Note {
+    velocity: u7,
+    key: u7,
+    ms_since_last_grain: f32,
+}
+
+pub enum EmitterMessage {
+    Settings(EmitterSettings),
+    Midi(MidiMessage),
 }
 
 pub struct Emitter<I> {
@@ -27,7 +41,10 @@ pub struct Emitter<I> {
 
     pub settings: EmitterSettings,
 
+    channel: Receiver<EmitterMessage>,
+
     ms_since_last_grain: f32,
+    notes: Vec<Note>,
     grains: Vec<Grain<I>>,
 }
 
@@ -36,7 +53,7 @@ where
     I: Clone + Source,
     I::Item: Sample,
 {
-    pub fn new(input: I) -> Emitter<I>
+    pub fn new(input: I, channel: Receiver<EmitterMessage>) -> Emitter<I>
     where
         I: Clone + Source,
         I::Item: Sample,
@@ -44,8 +61,10 @@ where
         Emitter {
             input,
             settings: EmitterSettings::default(),
+            channel,
 
             ms_since_last_grain: 0.0,
+            notes: Vec::new(),
             grains: Vec::new(),
         }
     }
@@ -63,6 +82,13 @@ where
     fn grain_interval_ms(&self) -> f32 {
         self.settings.grain_size_ms * (1.0 - self.settings.overlap)
     }
+
+    fn handle_message(&mut self, msg: EmitterMessage) {
+        match msg {
+            EmitterMessage::Settings(settings) => self.settings = settings,
+            EmitterMessage::Midi(_) => {}
+        }
+    }
 }
 
 impl<I> Iterator for Emitter<I>
@@ -74,6 +100,14 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
+        // handle any messages waiting in the channel
+        loop {
+            match self.channel.try_recv() {
+                Ok(msg) => self.handle_message(msg),
+                Err(_) => break,
+            }
+        }
+
         // filter out grains that are done playing
         self.grains.retain(|g| !g.done_playing());
 
