@@ -91,7 +91,9 @@ where
     fn handle_message(&mut self, msg: EmitterMessage) {
         match msg {
             EmitterMessage::Settings(settings) => self.settings = settings,
-            EmitterMessage::Midi(_) => {}
+            EmitterMessage::Midi(midi_msg) => {
+                println!("{:?}", midi_msg);
+            }
             EmitterMessage::Terminate => self.terminated = true,
         }
     }

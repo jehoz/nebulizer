@@ -1,11 +1,13 @@
 use std::{
     fs::File,
     io::BufReader,
-    sync::mpsc::{self, Sender},
+    sync::{
+        mpsc::{self, Sender},
+        Arc, Mutex,
+    },
 };
 
 use eframe::egui::{self, Color32, Ui};
-use midir::{MidiIO, MidiInput};
 use midly::num::u4;
 use rodio::{source::Buffered, Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 
@@ -15,9 +17,9 @@ use crate::{
 };
 
 pub struct EmitterHandle {
-    settings: EmitterSettings,
-    channel: Sender<EmitterMessage>,
-    midi_channel: u4,
+    pub settings: EmitterSettings,
+    pub channel: Sender<EmitterMessage>,
+    pub midi_channel: u4,
 }
 
 pub struct NebulizerApp {
@@ -28,7 +30,7 @@ pub struct NebulizerApp {
 
     active_panel: GuiPanel,
 
-    emitters: Vec<EmitterHandle>,
+    emitters: Arc<Mutex<Vec<EmitterHandle>>>,
 }
 
 impl NebulizerApp {
@@ -42,7 +44,7 @@ impl NebulizerApp {
             sink,
             midi_config: MidiConfig::new(),
             active_panel: GuiPanel::Emitters,
-            emitters: Vec::new(),
+            emitters: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
@@ -85,7 +87,8 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     channel: tx,
                     midi_channel: u4::from(0),
                 };
-                app.emitters.push(handle);
+                let mut emitters = app.emitters.lock().unwrap();
+                emitters.push(handle);
                 app.sink.stop();
                 app.sink.append(emitter);
                 app.sink.play();
@@ -96,13 +99,23 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         }
     }
 
-    app.emitters = app
-        .emitters
+    let mut emitters = app.emitters.lock().unwrap();
+    *emitters = emitters
         .drain(0..)
         .filter_map(|mut handle| {
             ui.separator();
 
             ui.monospace("Emitter settings");
+
+            egui::ComboBox::from_label("MIDI Channel")
+                .selected_text(handle.midi_channel.to_string())
+                .show_ui(ui, |ui| {
+                    for i in 0..=15 {
+                        let chan = u4::from(i);
+                        ui.selectable_value(&mut handle.midi_channel, chan, chan.to_string());
+                    }
+                });
+
             ui.horizontal(|ui| {
                 ui.label("Position");
                 ui.add(egui::Slider::new(&mut handle.settings.position, 0.0..=1.0));
@@ -154,11 +167,19 @@ fn midi_setup_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         None => {
             ui.label("Click one to connect:");
             for port in app.midi_config.ports.clone().iter() {
+                let emitters = app.emitters.clone();
                 if ui
                     .button(app.midi_config.midi_in.port_name(&port).unwrap())
                     .clicked()
                 {
-                    app.midi_config.connect(port);
+                    app.midi_config.connect(port, move |channel, message| {
+                        let handles = emitters.lock().unwrap();
+                        for handle in handles.iter() {
+                            if handle.midi_channel == channel {
+                                let _ = handle.channel.send(EmitterMessage::Midi(message));
+                            }
+                        }
+                    });
                 }
             }
         }
