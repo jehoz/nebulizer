@@ -5,13 +5,19 @@ use std::{
 };
 
 use eframe::egui::{self, Color32, Ui};
+use midir::{MidiIO, MidiInput};
 use rodio::{source::Buffered, Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 
-use crate::emitter::{Emitter, EmitterMessage, EmitterSettings};
+use crate::{
+    emitter::{Emitter, EmitterMessage, EmitterSettings},
+    midi::MidiConfig,
+};
 
 pub struct NebulizerApp {
     stream: (OutputStream, OutputStreamHandle),
     sink: Sink,
+
+    midi_config: MidiConfig,
 
     active_panel: GuiPanel,
 
@@ -21,12 +27,14 @@ pub struct NebulizerApp {
 
 impl NebulizerApp {
     pub fn new() -> NebulizerApp {
+        // setup audio stream
         let (stream, stream_handle) = OutputStream::try_default().unwrap();
         let sink = Sink::try_new(&stream_handle).unwrap();
 
         NebulizerApp {
             stream: (stream, stream_handle),
             sink,
+            midi_config: MidiConfig::new(),
             active_panel: GuiPanel::Emitters,
             emitter_channel: None,
             emitter_settings: EmitterSettings::default(),
@@ -55,7 +63,7 @@ impl eframe::App for NebulizerApp {
 
         egui::CentralPanel::default().show(ctx, |ui| match self.active_panel {
             GuiPanel::Emitters => emitters_panel(self, ui),
-            GuiPanel::MidiSetup => {}
+            GuiPanel::MidiSetup => midi_setup_panel(self, ui),
         });
     }
 }
@@ -113,6 +121,28 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
     // send message to update emitter's settings
     if let Some(channel) = &app.emitter_channel {
         let _ = channel.send(EmitterMessage::Settings(app.emitter_settings.clone()));
+    }
+}
+
+fn midi_setup_panel(app: &mut NebulizerApp, ui: &mut Ui) {
+    match &app.midi_config.connection {
+        Some((name, _conn)) => {
+            ui.label(format!("Connected to MIDI port: {}", name));
+            if ui.button("Disconnect").clicked() {
+                app.midi_config.connection = None;
+            }
+        }
+        None => {
+            ui.label("Click one to connect:");
+            for port in app.midi_config.ports.clone().iter() {
+                if ui
+                    .button(app.midi_config.midi_in.port_name(&port).unwrap())
+                    .clicked()
+                {
+                    app.midi_config.connect(port);
+                }
+            }
+        }
     }
 }
 

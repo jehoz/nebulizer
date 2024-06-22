@@ -1,54 +1,50 @@
-use std::error::Error;
-
-use midir::MidiInput;
+use midir::{MidiInput, MidiInputConnection, MidiInputPort, MidiInputPorts};
 use midly::{live::LiveEvent, MidiMessage};
 
-pub fn run() -> Result<(), Box<dyn Error>> {
-    let midi_in = MidiInput::new("nebulizer midi input")?;
+pub struct MidiConfig {
+    pub midi_in: MidiInput,
+    pub ports: MidiInputPorts,
+    pub connection: Option<(String, MidiInputConnection<()>)>,
+}
 
-    let in_ports = midi_in.ports();
-    let in_port = match in_ports.len() {
-        0 => return Err("no input port found".into()),
-        1 => {
-            println!(
-                "Choosing the only available input port: {}",
-                midi_in.port_name(&in_ports[0]).unwrap()
-            );
-            &in_ports[0]
-        }
-        _ => {
-            println!("\nAvailable input ports:");
-            for (i, p) in in_ports.iter().enumerate() {
-                println!("{}: {}", i, midi_in.port_name(p).unwrap());
-            }
-            println!(
-                "Picking the first one: {}",
-                midi_in.port_name(&in_ports[0]).unwrap()
-            );
-            &in_ports[0]
-        }
-    };
+impl MidiConfig {
+    pub fn new() -> MidiConfig {
+        let midi_in = MidiInput::new("Nebulizer MIDI in").unwrap();
+        let ports = midi_in.ports();
 
-    let _conn = midi_in.connect(
-        in_port,
-        "nebulizer-input-port",
-        move |_stamp, msg, _| {
-            let event = LiveEvent::parse(msg).unwrap();
-            match event {
-                LiveEvent::Midi { channel, message } => match message {
-                    MidiMessage::NoteOn { key, .. } => {
-                        println!("CH{}: Note {} down", channel, key)
-                    }
-                    MidiMessage::NoteOff { key, .. } => {
-                        println!("CH{}: Note {} up", channel, key)
-                    }
-                    _ => {}
-                },
-                _ => {}
+        MidiConfig {
+            midi_in,
+            ports,
+            connection: None,
+        }
+    }
+
+    pub fn connect(&mut self, port: &MidiInputPort) {
+        let port_name = self.midi_in.port_name(port).unwrap();
+        // have to make a new one because `connect` takes ownership for some reason
+        let midi_input = MidiInput::new("Connection input (?)").unwrap();
+        let conn = midi_input.connect(
+            &port,
+            "nebulizer-input-port",
+            |_stamp, msg, _| handle_midi_message(msg),
+            (),
+        );
+        self.connection = conn.ok().map(|c| (port_name, c));
+    }
+}
+
+fn handle_midi_message(msg_raw: &[u8]) {
+    let event = LiveEvent::parse(msg_raw).unwrap();
+    match event {
+        LiveEvent::Midi { channel, message } => match message {
+            MidiMessage::NoteOn { key, .. } => {
+                println!("CH{}: Note {} down", channel, key)
             }
+            MidiMessage::NoteOff { key, .. } => {
+                println!("CH{}: Note {} up", channel, key)
+            }
+            _ => {}
         },
-        (),
-    );
-
-    loop {}
+        _ => {}
+    }
 }
