@@ -6,12 +6,19 @@ use std::{
 
 use eframe::egui::{self, Color32, Ui};
 use midir::{MidiIO, MidiInput};
+use midly::num::u4;
 use rodio::{source::Buffered, Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 
 use crate::{
     emitter::{Emitter, EmitterMessage, EmitterSettings},
     midi::MidiConfig,
 };
+
+pub struct EmitterHandle {
+    settings: EmitterSettings,
+    channel: Sender<EmitterMessage>,
+    midi_channel: u4,
+}
 
 pub struct NebulizerApp {
     stream: (OutputStream, OutputStreamHandle),
@@ -21,8 +28,7 @@ pub struct NebulizerApp {
 
     active_panel: GuiPanel,
 
-    emitter_channel: Option<Sender<EmitterMessage>>,
-    emitter_settings: EmitterSettings,
+    emitters: Vec<EmitterHandle>,
 }
 
 impl NebulizerApp {
@@ -36,8 +42,7 @@ impl NebulizerApp {
             sink,
             midi_config: MidiConfig::new(),
             active_panel: GuiPanel::Emitters,
-            emitter_channel: None,
-            emitter_settings: EmitterSettings::default(),
+            emitters: Vec::new(),
         }
     }
 }
@@ -69,13 +74,18 @@ impl eframe::App for NebulizerApp {
 }
 
 fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
-    if ui.button("Open file").clicked() {
+    if ui.button("New emitter").clicked() {
         if let Some(path) = rfd::FileDialog::new().pick_file() {
             // attempt to load and decode audio file
             if let Some(source) = load_audio_file(path.display().to_string()) {
                 let (tx, rx) = mpsc::channel();
                 let emitter = Emitter::new(source, rx);
-                app.emitter_channel = Some(tx);
+                let handle = EmitterHandle {
+                    settings: EmitterSettings::default(),
+                    channel: tx,
+                    midi_channel: u4::from(0),
+                };
+                app.emitters.push(handle);
                 app.sink.stop();
                 app.sink.append(emitter);
                 app.sink.play();
@@ -86,41 +96,38 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         }
     }
 
-    ui.monospace("Emitter settings");
-    ui.horizontal(|ui| {
-        ui.label("Position");
-        ui.add(egui::Slider::new(
-            &mut app.emitter_settings.position,
-            0.0..=1.0,
-        ));
-    });
+    for handle in app.emitters.iter_mut() {
+        ui.separator();
 
-    ui.horizontal(|ui| {
-        ui.label("Grain size");
-        ui.add(
-            egui::Slider::new(&mut app.emitter_settings.grain_size_ms, 1.0..=1000.0).suffix("ms"),
-        );
-    });
+        ui.monospace("Emitter settings");
+        ui.horizontal(|ui| {
+            ui.label("Position");
+            ui.add(egui::Slider::new(&mut handle.settings.position, 0.0..=1.0));
+        });
 
-    ui.horizontal(|ui| {
-        ui.label("Envelope");
-        ui.add(egui::Slider::new(
-            &mut app.emitter_settings.envelope,
-            0.0..=1.0,
-        ));
-    });
+        ui.horizontal(|ui| {
+            ui.label("Grain size");
+            ui.add(
+                egui::Slider::new(&mut handle.settings.grain_size_ms, 1.0..=1000.0)
+                    .suffix("ms")
+                    .logarithmic(true),
+            );
+        });
 
-    ui.horizontal(|ui| {
-        ui.label("Overlap");
-        ui.add(egui::Slider::new(
-            &mut app.emitter_settings.overlap,
-            0.0..=0.99,
-        ));
-    });
+        ui.horizontal(|ui| {
+            ui.label("Envelope");
+            ui.add(egui::Slider::new(&mut handle.settings.envelope, 0.0..=1.0));
+        });
 
-    // send message to update emitter's settings
-    if let Some(channel) = &app.emitter_channel {
-        let _ = channel.send(EmitterMessage::Settings(app.emitter_settings.clone()));
+        ui.horizontal(|ui| {
+            ui.label("Overlap");
+            ui.add(egui::Slider::new(&mut handle.settings.overlap, 0.0..=0.99));
+        });
+
+        // send message to update emitter's settings
+        let _ = handle
+            .channel
+            .send(EmitterMessage::Settings(handle.settings.clone()));
     }
 }
 
