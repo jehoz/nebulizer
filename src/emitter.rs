@@ -34,6 +34,7 @@ struct Note {
 pub enum EmitterMessage {
     Settings(EmitterSettings),
     Midi(MidiMessage),
+    Terminate,
 }
 
 pub struct Emitter<I> {
@@ -46,6 +47,8 @@ pub struct Emitter<I> {
     ms_since_last_grain: f32,
     notes: Vec<Note>,
     grains: Vec<Grain<I>>,
+
+    terminated: bool,
 }
 
 impl<I> Emitter<I>
@@ -66,6 +69,8 @@ where
             ms_since_last_grain: 0.0,
             notes: Vec::new(),
             grains: Vec::new(),
+
+            terminated: false,
         }
     }
 
@@ -87,6 +92,7 @@ where
         match msg {
             EmitterMessage::Settings(settings) => self.settings = settings,
             EmitterMessage::Midi(_) => {}
+            EmitterMessage::Terminate => self.terminated = true,
         }
     }
 }
@@ -106,6 +112,10 @@ where
                 Ok(msg) => self.handle_message(msg),
                 Err(_) => break,
             }
+        }
+
+        if self.terminated {
+            return None;
         }
 
         // filter out grains that are done playing

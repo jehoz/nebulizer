@@ -96,39 +96,51 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         }
     }
 
-    for handle in app.emitters.iter_mut() {
-        ui.separator();
+    app.emitters = app
+        .emitters
+        .drain(0..)
+        .filter_map(|mut handle| {
+            ui.separator();
 
-        ui.monospace("Emitter settings");
-        ui.horizontal(|ui| {
-            ui.label("Position");
-            ui.add(egui::Slider::new(&mut handle.settings.position, 0.0..=1.0));
-        });
+            ui.monospace("Emitter settings");
+            ui.horizontal(|ui| {
+                ui.label("Position");
+                ui.add(egui::Slider::new(&mut handle.settings.position, 0.0..=1.0));
+            });
 
-        ui.horizontal(|ui| {
-            ui.label("Grain size");
-            ui.add(
-                egui::Slider::new(&mut handle.settings.grain_size_ms, 1.0..=1000.0)
-                    .suffix("ms")
-                    .logarithmic(true),
-            );
-        });
+            ui.horizontal(|ui| {
+                ui.label("Grain size");
+                ui.add(
+                    egui::Slider::new(&mut handle.settings.grain_size_ms, 1.0..=1000.0)
+                        .suffix("ms")
+                        .logarithmic(true),
+                );
+            });
 
-        ui.horizontal(|ui| {
-            ui.label("Envelope");
-            ui.add(egui::Slider::new(&mut handle.settings.envelope, 0.0..=1.0));
-        });
+            ui.horizontal(|ui| {
+                ui.label("Envelope");
+                ui.add(egui::Slider::new(&mut handle.settings.envelope, 0.0..=1.0));
+            });
 
-        ui.horizontal(|ui| {
-            ui.label("Overlap");
-            ui.add(egui::Slider::new(&mut handle.settings.overlap, 0.0..=0.99));
-        });
+            ui.horizontal(|ui| {
+                ui.label("Overlap");
+                ui.add(egui::Slider::new(&mut handle.settings.overlap, 0.0..=0.99));
+            });
 
-        // send message to update emitter's settings
-        let _ = handle
-            .channel
-            .send(EmitterMessage::Settings(handle.settings.clone()));
-    }
+            if ui.button("Delete").clicked() {
+                let _ = handle.channel.send(EmitterMessage::Terminate);
+
+                None
+            } else {
+                // send message to update emitter's settings
+                let _ = handle
+                    .channel
+                    .send(EmitterMessage::Settings(handle.settings.clone()));
+
+                Some(handle)
+            }
+        })
+        .collect();
 }
 
 fn midi_setup_panel(app: &mut NebulizerApp, ui: &mut Ui) {
