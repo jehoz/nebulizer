@@ -151,7 +151,8 @@ where
 
             if note.ms_since_last_grain >= self.grain_interval_ms() {
                 let amplitude = (note.velocity.as_int() as f32) / 127.0;
-                let speed = interval_to_ratio((note.key.as_int() as i32) - 60);
+                let speed =
+                    interval_to_ratio((note.key.as_int() as i32 + self.settings.transpose) - 60);
                 let g = self.make_grain(amplitude, speed);
                 self.grains.push(g);
                 note.ms_since_last_grain = 0.0;

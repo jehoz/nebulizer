@@ -140,6 +140,11 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 ui.add(egui::Slider::new(&mut handle.settings.overlap, 0.0..=0.99));
             });
 
+            ui.horizontal(|ui| {
+                ui.label("Transpose");
+                ui.add(egui::Slider::new(&mut handle.settings.transpose, -36..=36));
+            });
+
             if ui.button("Delete").clicked() {
                 let _ = handle.channel.send(EmitterMessage::Terminate);
 
