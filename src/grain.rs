@@ -107,6 +107,6 @@ fn tukey_window(x: f32, length: f32, radius: f32) -> f32 {
         1.0
     } else {
         0.5 * (1.0
-            - f32::cos((2.0 * PI * (x - length + (0.5 * length * radius))) / (length * radius)))
+            + f32::cos((2.0 * PI * (x - length + (0.5 * length * radius))) / (length * radius)))
     }
 }
