@@ -1,4 +1,5 @@
 use midly::{num::u7, MidiMessage};
+use rodio::cpal::Sample as CpalSample;
 use rodio::{Sample, Source};
 use std::{sync::mpsc::Receiver, time::Duration};
 
@@ -37,14 +38,17 @@ pub enum EmitterMessage {
     Terminate,
 }
 
-pub struct Emitter<I> {
+pub struct Emitter<I>
+where
+    I: Source,
+    I::Item: Sample,
+{
     input: I,
 
     pub settings: EmitterSettings,
 
     channel: Receiver<EmitterMessage>,
 
-    ms_since_last_grain: f32,
     notes: Vec<Note>,
     grains: Vec<Grain<I>>,
 
@@ -66,7 +70,6 @@ where
             settings: EmitterSettings::default(),
             channel,
 
-            ms_since_last_grain: 0.0,
             notes: Vec::new(),
             grains: Vec::new(),
 
@@ -74,14 +77,21 @@ where
         }
     }
 
-    pub fn make_grain(&self) -> Grain<I> {
+    pub fn make_grain(&self, amplitude: f32, speed: f32) -> Grain<I> {
         let start = self
             .input
             .total_duration()
             .unwrap()
             .mul_f32(self.settings.position);
         let size = Duration::from_nanos((1000000.0 * self.settings.grain_size_ms) as u64);
-        Grain::new(&self.input, start, size, self.settings.envelope)
+        Grain::new(
+            &self.input,
+            start,
+            size,
+            self.settings.envelope,
+            amplitude,
+            speed,
+        )
     }
 
     fn grain_interval_ms(&self) -> f32 {
@@ -91,9 +101,19 @@ where
     fn handle_message(&mut self, msg: EmitterMessage) {
         match msg {
             EmitterMessage::Settings(settings) => self.settings = settings,
-            EmitterMessage::Midi(midi_msg) => {
-                println!("{:?}", midi_msg);
-            }
+            EmitterMessage::Midi(midi_msg) => match midi_msg {
+                MidiMessage::NoteOn { key, vel } => {
+                    self.notes.push(Note {
+                        velocity: vel,
+                        key,
+                        ms_since_last_grain: 10000.0,
+                    });
+                }
+                MidiMessage::NoteOff { key, .. } => {
+                    self.notes.retain(|n| n.key != key);
+                }
+                _ => {}
+            },
             EmitterMessage::Terminate => self.terminated = true,
         }
     }
@@ -123,19 +143,27 @@ where
         // filter out grains that are done playing
         self.grains.retain(|g| !g.done_playing());
 
-        // make new grain if needed
-        self.ms_since_last_grain += 1000.0 / (self.sample_rate() as f32 * self.channels() as f32);
-        if self.ms_since_last_grain >= self.grain_interval_ms() {
-            let g = self.make_grain();
-            self.grains.push(g);
-            self.ms_since_last_grain = 0.0;
+        // check each note playing and generate grains
+        let mut notes: Vec<Note> = self.notes.drain(0..).collect();
+        for note in notes.iter_mut() {
+            note.ms_since_last_grain +=
+                1000.0 / (self.sample_rate() as f32 * self.channels() as f32);
+
+            if note.ms_since_last_grain >= self.grain_interval_ms() {
+                let amplitude = (note.velocity.as_int() as f32) / 127.0;
+                let speed = interval_to_ratio((note.key.as_int() as i32) - 60);
+                let g = self.make_grain(amplitude, speed);
+                self.grains.push(g);
+                note.ms_since_last_grain = 0.0;
+            }
         }
+        self.notes = notes;
 
         // mix all grain samples into one
         let mut samples: Vec<I::Item> = Vec::new();
         for grain in self.grains.iter_mut() {
             if let Some(sample) = grain.next() {
-                samples.push(sample);
+                samples.push(CpalSample::from_sample(sample));
             }
         }
 
@@ -167,4 +195,9 @@ where
     fn total_duration(&self) -> Option<Duration> {
         None
     }
+}
+
+/// compute pitch ratio from number of semitones between notes
+fn interval_to_ratio(semitones: i32) -> f32 {
+    2.0_f32.powf(semitones as f32 / 12.0)
 }

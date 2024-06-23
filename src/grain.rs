@@ -1,12 +1,16 @@
 use rodio::{
-    source::{SkipDuration, TakeDuration},
+    source::{Amplify, SkipDuration, Speed, TakeDuration, UniformSourceIterator},
     Sample, Source,
 };
 use std::f32::consts::PI;
 use std::time::Duration;
 
-pub struct Grain<I> {
-    input: TakeDuration<SkipDuration<I>>,
+pub struct Grain<I>
+where
+    I: Source,
+    I::Item: Sample,
+{
+    input: UniformSourceIterator<Speed<Amplify<TakeDuration<SkipDuration<I>>>>, I::Item>,
 
     size_ns: f32,
     elapsed_ns: f32,
@@ -18,8 +22,24 @@ where
     I: Clone + Source,
     I::Item: Sample,
 {
-    pub fn new(input: &I, start: Duration, size: Duration, envelope: f32) -> Grain<I> {
-        let grain = input.clone().skip_duration(start).take_duration(size);
+    pub fn new(
+        input: &I,
+        start: Duration,
+        size: Duration,
+        envelope: f32,
+        amplitude: f32,
+        speed: f32,
+    ) -> Grain<I> {
+        let grain = UniformSourceIterator::new(
+            input
+                .clone()
+                .skip_duration(start)
+                .take_duration(size)
+                .amplify(amplitude)
+                .speed(speed),
+            input.channels(),
+            input.sample_rate(),
+        );
 
         Grain {
             input: grain,
