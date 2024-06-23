@@ -89,7 +89,11 @@ where
 
         let offset = random::<f32>() * self.settings.spray_ms - self.settings.spray_ms / 2.0;
         if offset < 0.0 {
-            start -= Duration::from_millis(1).mul_f32(-offset);
+            if start.as_secs_f32() <= (-offset * 1000.0) {
+                start = Duration::from_millis(0);
+            } else {
+                start -= Duration::from_millis(1).mul_f32(-offset);
+            }
         } else {
             start += Duration::from_millis(1).mul_f32(offset);
         }
