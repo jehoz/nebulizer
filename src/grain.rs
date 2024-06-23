@@ -12,7 +12,7 @@ where
 {
     input: UniformSourceIterator<Speed<Amplify<TakeDuration<SkipDuration<I>>>>, I::Item>,
 
-    size_ns: f32,
+    length_ns: f32,
     elapsed_ns: f32,
     envelope: f32,
 }
@@ -24,17 +24,19 @@ where
 {
     pub fn new(
         input: &I,
-        start: Duration,
-        size: Duration,
+        start: f32,
+        length: f32,
         envelope: f32,
         amplitude: f32,
         speed: f32,
     ) -> Grain<I> {
+        let skip_dur = input.total_duration().unwrap().mul_f32(start);
+        let take_dur = Duration::from_millis(1).mul_f32(length);
         let grain = UniformSourceIterator::new(
             input
                 .clone()
-                .skip_duration(start)
-                .take_duration(size)
+                .skip_duration(skip_dur)
+                .take_duration(take_dur)
                 .amplify(amplitude)
                 .speed(speed),
             input.channels(),
@@ -43,14 +45,14 @@ where
 
         Grain {
             input: grain,
-            size_ns: size.as_nanos() as f32,
+            length_ns: take_dur.as_nanos() as f32,
             elapsed_ns: 0.0,
             envelope: envelope.clamp(0.0, 1.0),
         }
     }
 
     pub fn done_playing(&self) -> bool {
-        self.elapsed_ns >= self.size_ns
+        self.elapsed_ns >= self.length_ns
     }
 }
 
@@ -63,7 +65,7 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let factor = tukey_window(self.elapsed_ns, self.size_ns, self.envelope);
+        let factor = tukey_window(self.elapsed_ns, self.length_ns, self.envelope);
         self.elapsed_ns +=
             1_000_000_000.0 / (self.input.sample_rate() as f32 * self.channels() as f32);
 

@@ -115,35 +115,37 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             });
 
             ui.horizontal(|ui| {
-                ui.label("Position");
-                ui.add(egui::Slider::new(&mut handle.settings.position, 0.0..=1.0));
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("Spray");
-                ui.add(egui::Slider::new(
-                    &mut handle.settings.spray_ms,
-                    0.0..=1000.0,
-                ));
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("Grain size");
                 ui.add(
-                    egui::Slider::new(&mut handle.settings.grain_size_ms, 1.0..=1000.0)
-                        .suffix("ms")
-                        .logarithmic(true),
+                    egui::Slider::new(&mut handle.settings.position, 0.0..=1.0).text("Position"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut handle.settings.position_rand, 0.0..=1.0).text("Random"),
                 );
             });
 
             ui.horizontal(|ui| {
-                ui.label("Envelope");
-                ui.add(egui::Slider::new(&mut handle.settings.envelope, 0.0..=1.0));
+                ui.add(
+                    egui::Slider::new(&mut handle.settings.grain_size, 1.0..=1000.0)
+                        .suffix("ms")
+                        .logarithmic(true)
+                        .text("Grain length"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut handle.settings.grain_size_rand, 0.0..=1.0)
+                        .text("Random"),
+                );
             });
 
+            ui.add(
+                egui::Slider::new(&mut handle.settings.density, 1.0..=1000.0)
+                    .suffix("Hz")
+                    .logarithmic(true)
+                    .text("Density"),
+            );
+
             ui.horizontal(|ui| {
-                ui.label("Overlap");
-                ui.add(egui::Slider::new(&mut handle.settings.overlap, 0.0..=0.99));
+                ui.label("Envelope");
+                ui.add(egui::Slider::new(&mut handle.settings.envelope, 0.0..=1.0));
             });
 
             ui.horizontal(|ui| {

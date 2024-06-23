@@ -1,6 +1,5 @@
 use midly::{num::u7, MidiMessage};
-use rand::random;
-use rodio::cpal::Sample as CpalSample;
+use rand::{thread_rng, Rng};
 use rodio::{Sample, Source};
 use std::{sync::mpsc::Receiver, time::Duration};
 
@@ -8,11 +7,23 @@ use crate::grain::Grain;
 
 #[derive(Clone)]
 pub struct EmitterSettings {
+    /// The relative position in the source file where a grain starts
     pub position: f32,
-    pub spray_ms: f32,
-    pub grain_size_ms: f32,
+    /// Amount of random deviation from position parameter
+    pub position_rand: f32,
+
+    /// The length of a grain window in ms
+    pub grain_size: f32,
+    /// Amount of random deviation from of grain_size parameter
+    pub grain_size_rand: f32,
+
+    /// The number of grains played per second (in hz)
+    pub density: f32,
+
+    /// Amount of fade in/out on ends of grain (computed with tukey window)
     pub envelope: f32,
-    pub overlap: f32,
+
+    /// Pitch transposition of input sample in semitones
     pub transpose: i32,
 }
 
@@ -20,10 +31,11 @@ impl Default for EmitterSettings {
     fn default() -> Self {
         EmitterSettings {
             position: 0.0,
-            spray_ms: 0.0,
-            grain_size_ms: 75.0,
-            envelope: 0.75,
-            overlap: 0.5,
+            position_rand: 0.0,
+            grain_size: 100.0,
+            grain_size_rand: 0.0,
+            density: 10.0,
+            envelope: 0.5,
             transpose: 0,
         }
     }
@@ -81,29 +93,33 @@ where
     }
 
     pub fn make_grain(&self, amplitude: f32, speed: f32) -> Grain<I> {
-        let mut start = self
-            .input
-            .total_duration()
-            .unwrap()
-            .mul_f32(self.settings.position);
+        let mut rng = thread_rng();
 
-        let offset = random::<f32>() * self.settings.spray_ms - self.settings.spray_ms / 2.0;
-        if offset < 0.0 {
-            if start.as_secs_f32() <= (-offset * 1000.0) {
-                start = Duration::from_millis(0);
+        let start = {
+            if self.settings.position_rand == 0.0 {
+                self.settings.position
             } else {
-                start -= Duration::from_millis(1).mul_f32(-offset);
+                let min = (self.settings.position - self.settings.position_rand / 2.0).max(0.0);
+                let max = (self.settings.position + self.settings.position_rand / 2.0).min(1.0);
+                rng.gen_range(min..max)
             }
-        } else {
-            start += Duration::from_millis(1).mul_f32(offset);
-        }
+        };
 
-        let size = Duration::from_millis(1).mul_f32(self.settings.grain_size_ms);
+        let length = {
+            if self.settings.grain_size_rand == 0.0 {
+                self.settings.grain_size
+            } else {
+                let scaled_rand = self.settings.grain_size_rand * (999.0);
+                let min = (self.settings.grain_size - scaled_rand / 2.0).max(1.0);
+                let max = (self.settings.grain_size + scaled_rand / 2.0).min(1000.0);
+                rng.gen_range(min..max)
+            }
+        };
 
         Grain::new(
             &self.input,
             start,
-            size,
+            length,
             self.settings.envelope,
             amplitude,
             speed,
@@ -111,7 +127,7 @@ where
     }
 
     fn grain_interval_ms(&self) -> f32 {
-        self.settings.grain_size_ms * (1.0 - self.settings.overlap)
+        1000.0 / self.settings.density
     }
 
     fn handle_message(&mut self, msg: EmitterMessage) {
@@ -180,7 +196,7 @@ where
         let mut samples: Vec<I::Item> = Vec::new();
         for grain in self.grains.iter_mut() {
             if let Some(sample) = grain.next() {
-                samples.push(CpalSample::from_sample(sample));
+                samples.push(sample);
             }
         }
 
