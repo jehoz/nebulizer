@@ -102,19 +102,22 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
     let mut emitters = app.emitters.lock().unwrap();
     *emitters = emitters
         .drain(0..)
-        .filter_map(|mut handle| {
+        .enumerate()
+        .filter_map(|(e, mut handle)| {
             ui.separator();
 
             ui.monospace("Emitter settings");
 
-            egui::ComboBox::from_label("MIDI Channel")
-                .selected_text(handle.midi_channel.to_string())
-                .show_ui(ui, |ui| {
-                    for i in 0..=15 {
-                        let chan = u4::from(i);
-                        ui.selectable_value(&mut handle.midi_channel, chan, chan.to_string());
-                    }
-                });
+            ui.push_id(e, |ui| {
+                egui::ComboBox::from_label("MIDI Channel")
+                    .selected_text(handle.midi_channel.to_string())
+                    .show_ui(ui, |ui| {
+                        for i in 0..=15 {
+                            let chan = u4::from(i);
+                            ui.selectable_value(&mut handle.midi_channel, chan, chan.to_string());
+                        }
+                    })
+            });
 
             ui.horizontal(|ui| {
                 ui.label("Position");
