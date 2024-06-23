@@ -9,7 +9,7 @@ use std::{
 
 use eframe::egui::{self, Color32, Ui};
 use midly::num::u4;
-use rodio::{source::Buffered, Decoder, OutputStream, OutputStreamHandle, Sink, Source};
+use rodio::{source::Buffered, Decoder, OutputStream, OutputStreamHandle, Source};
 
 use crate::{
     emitter::{Emitter, EmitterMessage, EmitterSettings},
@@ -24,7 +24,6 @@ pub struct EmitterHandle {
 
 pub struct NebulizerApp {
     stream: (OutputStream, OutputStreamHandle),
-    sink: Sink,
 
     midi_config: MidiConfig,
 
@@ -37,11 +36,9 @@ impl NebulizerApp {
     pub fn new() -> NebulizerApp {
         // setup audio stream
         let (stream, stream_handle) = OutputStream::try_default().unwrap();
-        let sink = Sink::try_new(&stream_handle).unwrap();
 
         NebulizerApp {
             stream: (stream, stream_handle),
-            sink,
             midi_config: MidiConfig::new(),
             active_panel: GuiPanel::Emitters,
             emitters: Arc::new(Mutex::new(Vec::new())),
@@ -89,9 +86,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 };
                 let mut emitters = app.emitters.lock().unwrap();
                 emitters.push(handle);
-                app.sink.stop();
-                app.sink.append(emitter);
-                app.sink.play();
+                let _ = app.stream.1.play_raw(emitter.convert_samples());
                 println!("Loaded emitter sound: {}", path.display().to_string());
             } else {
                 ui.colored_label(Color32::RED, "Failed to read/decode audio file!");
