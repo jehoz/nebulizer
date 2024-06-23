@@ -1,4 +1,5 @@
 use midly::{num::u7, MidiMessage};
+use rand::random;
 use rodio::cpal::Sample as CpalSample;
 use rodio::{Sample, Source};
 use std::{sync::mpsc::Receiver, time::Duration};
@@ -8,6 +9,7 @@ use crate::grain::Grain;
 #[derive(Clone)]
 pub struct EmitterSettings {
     pub position: f32,
+    pub spray_ms: f32,
     pub grain_size_ms: f32,
     pub envelope: f32,
     pub overlap: f32,
@@ -18,6 +20,7 @@ impl Default for EmitterSettings {
     fn default() -> Self {
         EmitterSettings {
             position: 0.0,
+            spray_ms: 0.0,
             grain_size_ms: 75.0,
             envelope: 0.75,
             overlap: 0.5,
@@ -78,12 +81,21 @@ where
     }
 
     pub fn make_grain(&self, amplitude: f32, speed: f32) -> Grain<I> {
-        let start = self
+        let mut start = self
             .input
             .total_duration()
             .unwrap()
             .mul_f32(self.settings.position);
-        let size = Duration::from_nanos((1000000.0 * self.settings.grain_size_ms) as u64);
+
+        let offset = random::<f32>() * self.settings.spray_ms - self.settings.spray_ms / 2.0;
+        if offset < 0.0 {
+            start -= Duration::from_millis(1).mul_f32(-offset);
+        } else {
+            start += Duration::from_millis(1).mul_f32(offset);
+        }
+
+        let size = Duration::from_millis(1).mul_f32(self.settings.grain_size_ms);
+
         Grain::new(
             &self.input,
             start,

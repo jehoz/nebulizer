@@ -122,6 +122,14 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             });
 
             ui.horizontal(|ui| {
+                ui.label("Spray");
+                ui.add(egui::Slider::new(
+                    &mut handle.settings.spray_ms,
+                    0.0..=1000.0,
+                ));
+            });
+
+            ui.horizontal(|ui| {
                 ui.label("Grain size");
                 ui.add(
                     egui::Slider::new(&mut handle.settings.grain_size_ms, 1.0..=1000.0)
