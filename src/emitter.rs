@@ -25,6 +25,9 @@ pub struct EmitterSettings {
 
     /// Pitch transposition of input sample in semitones
     pub transpose: i32,
+
+    /// The volume level of sound coming out of the emitter, relative to the original audio sample
+    pub amplitude: f32,
 }
 
 impl Default for EmitterSettings {
@@ -37,6 +40,7 @@ impl Default for EmitterSettings {
             density: 10.0,
             envelope: 0.5,
             transpose: 0,
+            amplitude: 1.0,
         }
     }
 }
@@ -92,7 +96,7 @@ where
         }
     }
 
-    pub fn make_grain(&self, amplitude: f32, speed: f32) -> Grain<I> {
+    pub fn make_grain(&self, speed: f32) -> Grain<I> {
         let mut rng = thread_rng();
 
         let start = {
@@ -121,7 +125,7 @@ where
             start,
             length,
             self.settings.envelope,
-            amplitude,
+            self.settings.amplitude,
             speed,
         )
     }
@@ -182,10 +186,10 @@ where
                 1000.0 / (self.sample_rate() as f32 * self.channels() as f32);
 
             if note.ms_since_last_grain >= self.grain_interval_ms() {
-                let amplitude = (note.velocity.as_int() as f32) / 127.0;
+                // let amplitude = (note.velocity.as_int() as f32) / 127.0;
                 let speed =
                     interval_to_ratio((note.key.as_int() as i32 + self.settings.transpose) - 60);
-                let g = self.make_grain(amplitude, speed);
+                let g = self.make_grain(speed);
                 self.grains.push(g);
                 note.ms_since_last_grain = 0.0;
             }
