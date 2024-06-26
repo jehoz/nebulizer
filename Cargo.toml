@@ -12,3 +12,4 @@ midly = "0.5.3"
 rand = "0.8.5"
 rfd = "0.14.1"
 rodio = "0.18.1"
+egui_extras_xt = { git = "https://github.com/xTibor/egui_extras_xt.git", features=["knobs"] }
