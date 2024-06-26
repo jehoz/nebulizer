@@ -197,10 +197,12 @@ where
         self.notes = notes;
 
         // mix all grain samples into one
+        // attenuate individual grain volume when many are playing simultaneously
+        let fac = 1.0 / ((self.grains.len() as f32).ln() + 1.0);
         let mut samples: Vec<I::Item> = Vec::new();
         for grain in self.grains.iter_mut() {
             if let Some(sample) = grain.next() {
-                samples.push(sample);
+                samples.push(sample.amplify(fac));
             }
         }
 
