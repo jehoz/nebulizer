@@ -8,7 +8,10 @@ use std::{
 };
 
 use eframe::egui::{self, Color32, DragValue, Margin, Stroke, Ui};
-use egui_extras_xt::{common::WidgetShape, knobs::AudioKnob};
+use egui_extras_xt::{
+    common::WidgetShape,
+    knobs::{AngleKnobPreset, AudioKnob},
+};
 use midly::num::u4;
 use rodio::{source::Buffered, Decoder, OutputStream, OutputStreamHandle, Source};
 
@@ -117,125 +120,98 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 
             ui.columns(5, |columns| {
                 columns[0].vertical_centered(|ui| {
-                    egui::Frame::none()
-                        .stroke(Stroke::new(1.0, Color32::DARK_GRAY))
-                        .inner_margin(Margin::same(4.0))
-                        .show(ui, |ui| {
-                            ui.vertical_centered(|ui| {
-                                ui.add(
-                                    DragValue::new(&mut handle.settings.position)
-                                        .clamp_range(0.0..=1.0),
-                                );
-                                ui.add(
-                                    AudioKnob::new(&mut handle.settings.position)
-                                        .diameter(32.0)
-                                        .shape(WidgetShape::Circle)
-                                        .drag_length(4.0)
-                                        .spread(0.8),
-                                );
-                                ui.label("Position");
-
-                                ui.add(
-                                    AudioKnob::new(&mut handle.settings.position_rand)
-                                        .diameter(24.0)
-                                        .shape(WidgetShape::Circle)
-                                        .drag_length(4.0)
-                                        .spread(0.8),
-                                );
-                                ui.label("Rand");
-                            });
-                        });
+                    ui.add(DragValue::new(&mut handle.settings.amplitude).clamp_range(0.0..=1.0));
+                    ui.add(
+                        AudioKnob::new(&mut handle.settings.amplitude)
+                            .diameter(32.0)
+                            .shape(WidgetShape::Circle)
+                            .drag_length(4.0)
+                            .spread(0.8),
+                    );
+                    ui.label("Level");
                 });
 
                 columns[1].vertical_centered(|ui| {
-                    egui::Frame::none()
-                        .stroke(Stroke::new(1.0, Color32::DARK_GRAY))
-                        .inner_margin(Margin::same(4.0))
-                        .show(ui, |ui| {
-                            ui.vertical_centered(|ui| {
-                                ui.add(
-                                    DragValue::new(&mut handle.settings.grain_size)
-                                        .suffix(" ms")
-                                        .clamp_range(1.0..=1000.0),
-                                );
-                                ui.add(
-                                    AudioKnob::new(&mut handle.settings.grain_size)
-                                        .diameter(32.0)
-                                        .shape(WidgetShape::Circle)
-                                        .range(1.0..=1000.0)
-                                        .drag_length(4.0)
-                                        .spread(0.8),
-                                );
-                                ui.label("Grain length");
+                    ui.add(DragValue::new(&mut handle.settings.position).clamp_range(0.0..=1.0));
+                    ui.add(
+                        AudioKnob::new(&mut handle.settings.position)
+                            .diameter(32.0)
+                            .shape(WidgetShape::Circle)
+                            .drag_length(4.0)
+                            .spread(0.8),
+                    );
+                    ui.label("Position");
 
-                                ui.add(
-                                    AudioKnob::new(&mut handle.settings.grain_size_rand)
-                                        .diameter(24.0)
-                                        .shape(WidgetShape::Circle)
-                                        .drag_length(4.0)
-                                        .spread(0.8),
-                                );
-                                ui.label("Rand");
-                            });
-                        });
+                    ui.add(
+                        AudioKnob::new(&mut handle.settings.position_rand)
+                            .diameter(24.0)
+                            .shape(WidgetShape::Circle)
+                            .drag_length(4.0)
+                            .spread(0.8),
+                    );
+                    ui.label("Rand");
                 });
 
                 columns[2].vertical_centered(|ui| {
-                    egui::Frame::none()
-                        .stroke(Stroke::new(1.0, Color32::DARK_GRAY))
-                        .inner_margin(Margin::same(4.0))
-                        .show(ui, |ui| {
-                            ui.vertical_centered(|ui| {
-                                ui.add(
-                                    DragValue::new(&mut handle.settings.density)
-                                        .suffix(" Hz")
-                                        .clamp_range(1.0..=1000.0),
-                                );
-                                ui.add(
-                                    AudioKnob::new(&mut handle.settings.density)
-                                        .diameter(32.0)
-                                        .shape(WidgetShape::Circle)
-                                        .range(1.0..=1000.0)
-                                        .drag_length(4.0)
-                                        .spread(0.8),
-                                );
-                                ui.label("Density");
-                            });
-                        });
+                    ui.add(
+                        DragValue::new(&mut handle.settings.grain_size)
+                            .suffix(" ms")
+                            .clamp_range(1.0..=1000.0),
+                    );
+                    ui.add(
+                        AudioKnob::new(&mut handle.settings.grain_size)
+                            .diameter(32.0)
+                            .shape(WidgetShape::Circle)
+                            .range(1.0..=1000.0)
+                            .drag_length(4.0)
+                            .spread(0.8),
+                    );
+                    ui.label("Grain length");
+
+                    ui.add(
+                        AudioKnob::new(&mut handle.settings.grain_size_rand)
+                            .diameter(24.0)
+                            .shape(WidgetShape::Circle)
+                            .drag_length(4.0)
+                            .spread(0.8),
+                    );
+                    ui.label("Rand");
                 });
 
                 columns[3].vertical_centered(|ui| {
-                    egui::Frame::none()
-                        .stroke(Stroke::new(1.0, Color32::DARK_GRAY))
-                        .inner_margin(Margin::same(4.0))
-                        .show(ui, |ui| {
-                            ui.vertical_centered(|ui| {
-                                ui.add(
-                                    DragValue::new(&mut handle.settings.envelope)
-                                        .clamp_range(0.0..=1.0),
-                                );
-                                ui.add(
-                                    AudioKnob::new(&mut handle.settings.envelope)
-                                        .diameter(32.0)
-                                        .shape(WidgetShape::Circle)
-                                        .range(0.0..=1.0)
-                                        .drag_length(4.0)
-                                        .spread(0.8),
-                                );
-                                ui.label("Envelope");
-                            });
-                        });
+                    ui.add(
+                        DragValue::new(&mut handle.settings.density)
+                            .suffix(" Hz")
+                            .clamp_range(1.0..=100.0),
+                    );
+                    ui.add(
+                        AudioKnob::new(&mut handle.settings.density)
+                            .diameter(32.0)
+                            .shape(WidgetShape::Circle)
+                            .range(1.0..=100.0)
+                            .drag_length(4.0)
+                            .spread(0.8),
+                    );
+                    ui.label("Density");
+                });
+
+                columns[4].vertical_centered(|ui| {
+                    ui.add(DragValue::new(&mut handle.settings.envelope).clamp_range(0.0..=1.0));
+                    ui.add(
+                        AudioKnob::new(&mut handle.settings.envelope)
+                            .diameter(32.0)
+                            .shape(WidgetShape::Circle)
+                            .range(0.0..=1.0)
+                            .drag_length(4.0)
+                            .spread(0.8),
+                    );
+                    ui.label("Envelope");
                 });
             });
 
             ui.horizontal(|ui| {
                 ui.label("Transpose");
                 ui.add(egui::Slider::new(&mut handle.settings.transpose, -36..=36));
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("Level");
-                ui.add(egui::Slider::new(&mut handle.settings.amplitude, 0.0..=1.0));
             });
 
             if ui.button("Delete").clicked() {
