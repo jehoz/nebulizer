@@ -2,6 +2,8 @@ mod app;
 mod emitter;
 mod grain;
 mod midi;
+mod widgets;
+mod window;
 
 use app::NebulizerApp;
 use eframe::egui::{Style, Visuals};

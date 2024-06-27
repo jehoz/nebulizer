@@ -2,8 +2,9 @@ use rodio::{
     source::{Amplify, SkipDuration, Speed, TakeDuration, UniformSourceIterator},
     Sample, Source,
 };
-use std::f32::consts::PI;
 use std::time::Duration;
+
+use crate::window::tukey_window;
 
 pub struct Grain<I>
 where
@@ -65,7 +66,7 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let factor = tukey_window(self.elapsed_ns, self.length_ns, self.envelope);
+        let factor = tukey_window(self.elapsed_ns, self.length_ns, self.envelope, 0.0);
         self.elapsed_ns +=
             1_000_000_000.0 / (self.input.sample_rate() as f32 * self.channels() as f32);
 
@@ -97,18 +98,5 @@ where
 
     fn total_duration(&self) -> Option<Duration> {
         self.input.total_duration()
-    }
-}
-
-fn tukey_window(x: f32, length: f32, radius: f32) -> f32 {
-    if x < 0.0 || x > length {
-        0.0
-    } else if x < 0.5 * length * radius {
-        0.5 * (1.0 - f32::cos((2.0 * PI * x) / (length * radius)))
-    } else if x < length - 0.5 * length * radius {
-        1.0
-    } else {
-        0.5 * (1.0
-            + f32::cos((2.0 * PI * (x - length + (0.5 * length * radius))) / (length * radius)))
     }
 }

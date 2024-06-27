@@ -7,20 +7,19 @@ use std::{
     },
 };
 
-use eframe::egui::{self, Color32, DragValue, Margin, Stroke, Ui};
-use egui_extras_xt::{
-    common::WidgetShape,
-    knobs::{AngleKnobPreset, AudioKnob},
-};
+use eframe::egui::{self, Color32, DragValue, Ui};
+use egui_extras_xt::{common::WidgetShape, knobs::AudioKnob};
 use midly::num::u4;
 use rodio::{source::Buffered, Decoder, OutputStream, OutputStreamHandle, Source};
 
 use crate::{
     emitter::{Emitter, EmitterMessage, EmitterSettings},
     midi::MidiConfig,
+    widgets::envelope_plot::envelope_plot,
 };
 
 pub struct EmitterHandle {
+    pub track_name: String,
     pub settings: EmitterSettings,
     pub channel: Sender<EmitterMessage>,
     pub midi_channel: u4,
@@ -77,13 +76,14 @@ impl eframe::App for NebulizerApp {
 }
 
 fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
-    if ui.button("New emitter").clicked() {
+    if ui.button("Load new sample").clicked() {
         if let Some(path) = rfd::FileDialog::new().pick_file() {
             // attempt to load and decode audio file
             if let Some(source) = load_audio_file(path.display().to_string()) {
                 let (tx, rx) = mpsc::channel();
                 let emitter = Emitter::new(source, rx);
                 let handle = EmitterHandle {
+                    track_name: path.file_name().unwrap().to_str().unwrap().to_string(),
                     settings: EmitterSettings::default(),
                     channel: tx,
                     midi_channel: u4::from(0),
@@ -103,9 +103,16 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         .drain(0..)
         .enumerate()
         .filter_map(|(e, mut handle)| {
+            let mut delete_clicked = false;
             ui.separator();
 
-            ui.monospace("Emitter settings");
+            ui.horizontal(|ui| {
+                ui.monospace(&handle.track_name);
+
+                if ui.button("X").clicked() {
+                    delete_clicked = true;
+                }
+            });
 
             ui.push_id(e, |ui| {
                 egui::ComboBox::from_label("MIDI Channel")
@@ -209,14 +216,24 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 });
             });
 
+            envelope_plot(ui, handle.settings.envelope, 0.0);
+
             ui.horizontal(|ui| {
                 ui.label("Transpose");
                 ui.add(egui::Slider::new(&mut handle.settings.transpose, -36..=36));
             });
 
-            if ui.button("Delete").clicked() {
+            ui.collapsing("MIDI CC", |ui| {
+                ui.columns(2, |columns| {
+                    columns[0].label("Pitchbend");
+                    columns[1].label("not ready yet :(")
+                });
+            });
+
+            if delete_clicked {
                 let _ = handle.channel.send(EmitterMessage::Terminate);
 
+                // return none to remove emitter handle from list
                 None
             } else {
                 // send message to update emitter's settings
