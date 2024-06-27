@@ -125,7 +125,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     })
             });
 
-            ui.columns(5, |columns| {
+            ui.columns(6, |columns| {
                 columns[0].vertical_centered(|ui| {
                     ui.add(DragValue::new(&mut handle.settings.amplitude).clamp_range(0.0..=1.0));
                     ui.add(
@@ -203,9 +203,11 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 });
 
                 columns[4].vertical_centered(|ui| {
-                    ui.add(DragValue::new(&mut handle.settings.envelope).clamp_range(0.0..=1.0));
                     ui.add(
-                        AudioKnob::new(&mut handle.settings.envelope)
+                        DragValue::new(&mut handle.settings.envelope_amount).clamp_range(0.0..=1.0),
+                    );
+                    ui.add(
+                        AudioKnob::new(&mut handle.settings.envelope_amount)
                             .diameter(32.0)
                             .shape(WidgetShape::Circle)
                             .range(0.0..=1.0)
@@ -214,9 +216,28 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     );
                     ui.label("Envelope");
                 });
+
+                columns[5].vertical_centered(|ui| {
+                    ui.add(
+                        DragValue::new(&mut handle.settings.envelope_skew).clamp_range(-1.0..=1.0),
+                    );
+                    ui.add(
+                        AudioKnob::new(&mut handle.settings.envelope_skew)
+                            .diameter(32.0)
+                            .shape(WidgetShape::Circle)
+                            .range(-1.0..=1.0)
+                            .drag_length(4.0)
+                            .spread(0.8),
+                    );
+                    ui.label("Envelope");
+                });
             });
 
-            envelope_plot(ui, handle.settings.envelope, 0.0);
+            envelope_plot(
+                ui,
+                handle.settings.envelope_amount,
+                handle.settings.envelope_skew,
+            );
 
             ui.horizontal(|ui| {
                 ui.label("Transpose");

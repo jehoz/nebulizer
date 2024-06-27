@@ -20,8 +20,14 @@ pub struct EmitterSettings {
     /// The number of grains played per second (in hz)
     pub density: f32,
 
-    /// Amount of fade in/out on ends of grain (computed with tukey window)
-    pub envelope: f32,
+    /// Proportion of the grain window that is eased in/out
+    pub envelope_amount: f32,
+
+    /// Skews the tukey window left or right:
+    /// -1 = instant attack, long decay
+    ///  0 = symmetrical attack and decay
+    ///  1 = long attack instant decay
+    pub envelope_skew: f32,
 
     /// Pitch transposition of input sample in semitones
     pub transpose: i32,
@@ -38,7 +44,8 @@ impl Default for EmitterSettings {
             grain_size: 100.0,
             grain_size_rand: 0.0,
             density: 10.0,
-            envelope: 0.5,
+            envelope_amount: 0.5,
+            envelope_skew: 0.0,
             transpose: 0,
             amplitude: 1.0,
         }
@@ -124,7 +131,8 @@ where
             &self.input,
             start,
             length,
-            self.settings.envelope,
+            self.settings.envelope_amount,
+            self.settings.envelope_skew,
             self.settings.amplitude,
             speed,
         )

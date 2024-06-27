@@ -15,7 +15,8 @@ where
 
     length_ns: f32,
     elapsed_ns: f32,
-    envelope: f32,
+    envelope_amount: f32,
+    envelope_skew: f32,
 }
 
 impl<I> Grain<I>
@@ -27,7 +28,8 @@ where
         input: &I,
         start: f32,
         length: f32,
-        envelope: f32,
+        envelope_amount: f32,
+        envelope_skew: f32,
         amplitude: f32,
         speed: f32,
     ) -> Grain<I> {
@@ -48,7 +50,8 @@ where
             input: grain,
             length_ns: take_dur.as_nanos() as f32,
             elapsed_ns: 0.0,
-            envelope: envelope.clamp(0.0, 1.0),
+            envelope_amount: envelope_amount.clamp(0.0, 1.0),
+            envelope_skew: envelope_skew.clamp(-1.0, 1.0),
         }
     }
 
@@ -66,7 +69,12 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let factor = tukey_window(self.elapsed_ns, self.length_ns, self.envelope, 0.0);
+        let factor = tukey_window(
+            self.elapsed_ns,
+            self.length_ns,
+            self.envelope_amount,
+            self.envelope_skew,
+        );
         self.elapsed_ns +=
             1_000_000_000.0 / (self.input.sample_rate() as f32 * self.channels() as f32);
 
