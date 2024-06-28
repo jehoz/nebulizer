@@ -1,25 +1,26 @@
-use std::{
-    fs::File,
-    io::BufReader,
-    sync::{
-        mpsc::{self, Sender},
-        Arc, Mutex,
-    },
+use std::sync::{
+    mpsc::{self, Sender},
+    Arc, Mutex,
 };
 
 use eframe::egui::{self, Color32, DragValue, Ui};
 use egui_extras_xt::{common::WidgetShape, knobs::AudioKnob};
 use midly::num::u4;
-use rodio::{source::Buffered, Decoder, OutputStream, OutputStreamHandle, Source};
+use rodio::{OutputStream, OutputStreamHandle, Source};
 
 use crate::{
+    audio_clip::load_audio_clip,
     emitter::{Emitter, EmitterMessage, EmitterSettings},
     midi::MidiConfig,
-    widgets::envelope_plot::envelope_plot,
+    widgets::{
+        envelope_plot::envelope_plot,
+        waveform::{self, WaveformData},
+    },
 };
 
 pub struct EmitterHandle {
     pub track_name: String,
+    pub waveform: WaveformData,
     pub settings: EmitterSettings,
     pub channel: Sender<EmitterMessage>,
     pub midi_channel: u4,
@@ -79,11 +80,12 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
     if ui.button("Load new sample").clicked() {
         if let Some(path) = rfd::FileDialog::new().pick_file() {
             // attempt to load and decode audio file
-            if let Some(source) = load_audio_file(path.display().to_string()) {
+            if let Some(clip) = load_audio_clip(path.display().to_string()) {
                 let (tx, rx) = mpsc::channel();
-                let emitter = Emitter::new(source, rx);
+                let emitter = Emitter::new(clip.clone(), rx);
                 let handle = EmitterHandle {
                     track_name: path.file_name().unwrap().to_str().unwrap().to_string(),
+                    waveform: WaveformData::new(clip),
                     settings: EmitterSettings::default(),
                     channel: tx,
                     midi_channel: u4::from(0),
@@ -124,6 +126,8 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                         }
                     })
             });
+
+            waveform::waveform(ui, &handle.waveform);
 
             ui.columns(6, |columns| {
                 columns[0].vertical_centered(|ui| {
@@ -229,7 +233,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                             .drag_length(4.0)
                             .spread(0.8),
                     );
-                    ui.label("Envelope");
+                    ui.label("Skew");
                 });
             });
 
@@ -295,19 +299,5 @@ fn midi_setup_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 }
             }
         }
-    }
-}
-
-type AudioClip = Buffered<Decoder<BufReader<File>>>;
-
-fn load_audio_file(path: String) -> Option<AudioClip> {
-    if let Some(file) = File::open(path).ok() {
-        if let Some(decoder) = Decoder::new(BufReader::new(file)).ok() {
-            Some(decoder.buffered())
-        } else {
-            None
-        }
-    } else {
-        None
     }
 }
