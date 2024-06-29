@@ -129,7 +129,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 
             waveform::waveform(ui, &handle.waveform);
 
-            ui.columns(6, |columns| {
+            ui.columns(5, |columns| {
                 columns[0].vertical_centered(|ui| {
                     ui.add(DragValue::new(&mut handle.settings.amplitude).clamp_range(0.0..=1.0));
                     ui.add(
@@ -207,41 +207,48 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 });
 
                 columns[4].vertical_centered(|ui| {
-                    ui.add(
-                        DragValue::new(&mut handle.settings.envelope_amount).clamp_range(0.0..=1.0),
-                    );
-                    ui.add(
-                        AudioKnob::new(&mut handle.settings.envelope_amount)
-                            .diameter(32.0)
-                            .shape(WidgetShape::Circle)
-                            .range(0.0..=1.0)
-                            .drag_length(4.0)
-                            .spread(0.8),
+                    envelope_plot(
+                        ui,
+                        handle.settings.envelope_amount,
+                        handle.settings.envelope_skew,
                     );
                     ui.label("Envelope");
-                });
 
-                columns[5].vertical_centered(|ui| {
-                    ui.add(
-                        DragValue::new(&mut handle.settings.envelope_skew).clamp_range(-1.0..=1.0),
-                    );
-                    ui.add(
-                        AudioKnob::new(&mut handle.settings.envelope_skew)
-                            .diameter(32.0)
-                            .shape(WidgetShape::Circle)
-                            .range(-1.0..=1.0)
-                            .drag_length(4.0)
-                            .spread(0.8),
-                    );
-                    ui.label("Skew");
+                    ui.columns(2, |inner_cols| {
+                        inner_cols[0].vertical_centered(|ui| {
+                            ui.add(
+                                DragValue::new(&mut handle.settings.envelope_amount)
+                                    .clamp_range(0.0..=1.0),
+                            );
+                            ui.add(
+                                AudioKnob::new(&mut handle.settings.envelope_amount)
+                                    .diameter(32.0)
+                                    .shape(WidgetShape::Circle)
+                                    .range(0.0..=1.0)
+                                    .drag_length(4.0)
+                                    .spread(0.8),
+                            );
+                            ui.label("Amount");
+                        });
+
+                        inner_cols[1].vertical_centered(|ui| {
+                            ui.add(
+                                DragValue::new(&mut handle.settings.envelope_skew)
+                                    .clamp_range(-1.0..=1.0),
+                            );
+                            ui.add(
+                                AudioKnob::new(&mut handle.settings.envelope_skew)
+                                    .diameter(32.0)
+                                    .shape(WidgetShape::Circle)
+                                    .range(-1.0..=1.0)
+                                    .drag_length(4.0)
+                                    .spread(0.8),
+                            );
+                            ui.label("Skew");
+                        });
+                    });
                 });
             });
-
-            envelope_plot(
-                ui,
-                handle.settings.envelope_amount,
-                handle.settings.envelope_skew,
-            );
 
             ui.horizontal(|ui| {
                 ui.label("Transpose");
