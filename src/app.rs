@@ -127,7 +127,12 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     })
             });
 
-            waveform::waveform(ui, &handle.waveform);
+            waveform::waveform(
+                ui,
+                &handle.waveform,
+                handle.settings.position,
+                handle.settings.position_rand,
+            );
 
             ui.columns(5, |columns| {
                 columns[0].vertical_centered(|ui| {

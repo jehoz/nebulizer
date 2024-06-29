@@ -1,5 +1,5 @@
 use eframe::{
-    egui::{pos2, vec2, Color32, Frame, Rect, Stroke, Ui},
+    egui::{pos2, vec2, Color32, Frame, Rect, Rounding, Stroke, Ui, Vec2},
     emath, epaint,
 };
 use rodio::cpal::Sample as CpalSample;
@@ -41,9 +41,10 @@ impl WaveformData {
     }
 }
 
-pub fn waveform(ui: &mut Ui, data: &WaveformData) {
+pub fn waveform(ui: &mut Ui, data: &WaveformData, playhead_position: f32, playhead_range: f32) {
     Frame::canvas(ui.style()).show(ui, |ui| {
         let color = Color32::from_additive_luminance(196);
+        let playhead_color = Color32::from_rgba_unmultiplied(88, 180, 237, 64);
 
         let desired_size = ui.available_width() * vec2(1.0, 0.35);
         let (_id, rect) = ui.allocate_space(desired_size);
@@ -53,6 +54,7 @@ pub fn waveform(ui: &mut Ui, data: &WaveformData) {
 
         let mut shapes = vec![];
 
+        // waveform
         let n = data.points.len();
         for i in 0..n {
             let x = (i as f32) / (n as f32);
@@ -64,6 +66,25 @@ pub fn waveform(ui: &mut Ui, data: &WaveformData) {
                 Stroke::new(1.0, color),
             ));
         }
+
+        // playhead
+        if playhead_range > 0.0 {
+            let min = (playhead_position - playhead_range / 2.0).max(0.0);
+            let max = (playhead_position + playhead_range / 2.0).min(1.0);
+            shapes.push(epaint::Shape::rect_filled(
+                Rect::from_min_max(to_screen * pos2(min, 1.0), to_screen * pos2(max, -1.0)),
+                Rounding::ZERO,
+                playhead_color,
+            ));
+        }
+
+        shapes.push(epaint::Shape::line_segment(
+            [
+                to_screen * pos2(playhead_position, 1.0),
+                to_screen * pos2(playhead_position, -1.0),
+            ],
+            Stroke::new(2.0, playhead_color.to_opaque()),
+        ));
         ui.painter().extend(shapes)
     });
 }
