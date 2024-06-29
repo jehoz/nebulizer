@@ -10,7 +10,7 @@ use rodio::{OutputStream, OutputStreamHandle, Source};
 
 use crate::{
     audio_clip::load_audio_clip,
-    emitter::{Emitter, EmitterMessage, EmitterSettings},
+    emitter::{Emitter, EmitterMessage, EmitterSettings, KeyMode},
     midi::MidiConfig,
     widgets::{
         envelope_plot::envelope_plot,
@@ -116,23 +116,35 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 }
             });
 
-            ui.push_id(e, |ui| {
-                egui::ComboBox::from_label("MIDI Channel")
-                    .selected_text(handle.midi_channel.to_string())
-                    .show_ui(ui, |ui| {
-                        for i in 0..=15 {
-                            let chan = u4::from(i);
-                            ui.selectable_value(&mut handle.midi_channel, chan, chan.to_string());
-                        }
-                    })
-            });
-
             waveform::waveform(
                 ui,
                 &handle.waveform,
                 handle.settings.position,
                 handle.settings.position_rand,
             );
+
+            match handle.settings.key_mode {
+                KeyMode::Pitch => {
+                    if ui.button("Note => Pitch").clicked() {
+                        handle.settings.key_mode = KeyMode::Slice(12);
+                    }
+                }
+                KeyMode::Slice(num_slices) => {
+                    if ui.button("Note => Slice").clicked() {
+                        handle.settings.key_mode = KeyMode::Pitch;
+                    }
+
+                    ui.horizontal(|ui| {
+                        ui.label(format!("{} slices", num_slices));
+                        if ui.button("-").clicked() {
+                            handle.settings.key_mode = KeyMode::Slice(num_slices - 1);
+                        }
+                        if ui.button("+").clicked() {
+                            handle.settings.key_mode = KeyMode::Slice(num_slices + 1);
+                        }
+                    });
+                }
+            }
 
             ui.columns(5, |columns| {
                 columns[0].vertical_centered(|ui| {
@@ -153,7 +165,8 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                         AudioKnob::new(&mut handle.settings.position)
                             .diameter(32.0)
                             .shape(WidgetShape::Circle)
-                            .drag_length(4.0)
+                            .drag_length(8.0)
+                            .interactive(handle.settings.key_mode == KeyMode::Pitch)
                             .spread(0.8),
                     );
                     ui.label("Position");
@@ -162,7 +175,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                         AudioKnob::new(&mut handle.settings.position_rand)
                             .diameter(24.0)
                             .shape(WidgetShape::Circle)
-                            .drag_length(4.0)
+                            .drag_length(8.0)
                             .spread(0.8),
                     );
                     ui.label("Rand");
@@ -258,6 +271,17 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             ui.horizontal(|ui| {
                 ui.label("Transpose");
                 ui.add(egui::Slider::new(&mut handle.settings.transpose, -36..=36));
+            });
+
+            ui.push_id(e, |ui| {
+                egui::ComboBox::from_label("MIDI Channel")
+                    .selected_text(handle.midi_channel.to_string())
+                    .show_ui(ui, |ui| {
+                        for i in 0..=15 {
+                            let chan = u4::from(i);
+                            ui.selectable_value(&mut handle.midi_channel, chan, chan.to_string());
+                        }
+                    })
             });
 
             ui.collapsing("MIDI CC", |ui| {

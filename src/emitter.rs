@@ -1,12 +1,21 @@
 use midly::{num::u7, MidiMessage};
 use rand::{thread_rng, Rng};
 use rodio::{Sample, Source};
-use std::{sync::mpsc::Receiver, time::Duration};
+use std::{mem, sync::mpsc::Receiver, time::Duration};
 
 use crate::grain::Grain;
 
+#[derive(Clone, PartialEq, Eq)]
+pub enum KeyMode {
+    Pitch,
+    Slice(u8),
+}
+
 #[derive(Clone)]
 pub struct EmitterSettings {
+    /// Whether MIDI keys control the pitch or the start position
+    pub key_mode: KeyMode,
+
     /// The relative position in the source file where a grain starts
     pub position: f32,
     /// Amount of random deviation from position parameter
@@ -39,6 +48,7 @@ pub struct EmitterSettings {
 impl Default for EmitterSettings {
     fn default() -> Self {
         EmitterSettings {
+            key_mode: KeyMode::Pitch,
             position: 0.0,
             position_rand: 0.0,
             grain_size: 100.0,
@@ -103,17 +113,33 @@ where
         }
     }
 
-    pub fn make_grain(&self, speed: f32) -> Grain<I> {
+    fn make_grain(&self, note: &Note) -> Grain<I> {
         let mut rng = thread_rng();
 
         let start = {
-            if self.settings.position_rand == 0.0 {
-                self.settings.position
-            } else {
-                let min = (self.settings.position - self.settings.position_rand / 2.0).max(0.0);
-                let max = (self.settings.position + self.settings.position_rand / 2.0).min(1.0);
+            let pos = match self.settings.key_mode {
+                KeyMode::Pitch => self.settings.position,
+
+                KeyMode::Slice(num_slices) => {
+                    let slice = note.key.as_int() % num_slices;
+                    slice as f32 / num_slices as f32
+                }
+            };
+
+            if self.settings.position_rand > 0.0 {
+                let min = (pos - self.settings.position_rand / 2.0).max(0.0);
+                let max = (pos + self.settings.position_rand / 2.0).min(1.0);
                 rng.gen_range(min..max)
+            } else {
+                pos
             }
+        };
+
+        let speed = match self.settings.key_mode {
+            KeyMode::Pitch => {
+                interval_to_ratio((note.key.as_int() as i32 + self.settings.transpose) - 60)
+            }
+            KeyMode::Slice(_) => interval_to_ratio(self.settings.transpose),
         };
 
         let length = {
@@ -188,16 +214,13 @@ where
         self.grains.retain(|g| !g.done_playing());
 
         // check each note playing and generate grains
-        let mut notes: Vec<Note> = self.notes.drain(0..).collect();
+        let ms_per_sample = 1000.0 / (self.sample_rate() as f32 * self.channels() as f32);
+        let mut notes: Vec<Note> = mem::take(&mut self.notes);
         for note in notes.iter_mut() {
-            note.ms_since_last_grain +=
-                1000.0 / (self.sample_rate() as f32 * self.channels() as f32);
+            note.ms_since_last_grain += ms_per_sample;
 
             if note.ms_since_last_grain >= self.grain_interval_ms() {
-                // let amplitude = (note.velocity.as_int() as f32) / 127.0;
-                let speed =
-                    interval_to_ratio((note.key.as_int() as i32 + self.settings.transpose) - 60);
-                let g = self.make_grain(speed);
+                let g = self.make_grain(note);
                 self.grains.push(g);
                 note.ms_since_last_grain = 0.0;
             }
