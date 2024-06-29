@@ -1,5 +1,5 @@
 use eframe::{
-    egui::{pos2, vec2, Color32, Frame, Rect, Rounding, Stroke, Ui, Vec2},
+    egui::{pos2, vec2, Color32, Frame, Rect, Rounding, Stroke, Ui},
     emath, epaint,
 };
 use rodio::cpal::Sample as CpalSample;
@@ -44,7 +44,7 @@ impl WaveformData {
 pub fn waveform(ui: &mut Ui, data: &WaveformData, playhead_position: f32, playhead_range: f32) {
     Frame::canvas(ui.style()).show(ui, |ui| {
         let color = Color32::from_additive_luminance(196);
-        let playhead_color = Color32::from_rgba_unmultiplied(88, 180, 237, 64);
+        let playhead_color = Color32::from_rgba_unmultiplied(255, 183, 0, 64);
 
         let desired_size = ui.available_width() * vec2(1.0, 0.35);
         let (_id, rect) = ui.allocate_space(desired_size);
