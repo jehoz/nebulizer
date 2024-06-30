@@ -17,6 +17,7 @@ use crate::{
     midi::MidiConfig,
     widgets::{
         envelope_plot::EnvelopePlot,
+        parameter_knob::ParameterKnob,
         waveform::{Waveform, WaveformData},
     },
 };
@@ -157,12 +158,9 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             ui.columns(3, |cols| {
                 cols[0].vertical_centered(|ui| {
                     ui.columns(2, |cols| {
-                        parameter_knob(
-                            &mut cols[0],
-                            &mut handle.settings.amplitude,
-                            0.0..=1.0,
-                            "",
-                            "Level",
+                        cols[0].add(
+                            ParameterKnob::new(&mut handle.settings.amplitude, 0.0..=1.0)
+                                .label("Level"),
                         );
 
                         parameter_knob(
