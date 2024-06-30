@@ -1,13 +1,9 @@
-use std::{
-    ops::RangeInclusive,
-    sync::{
-        mpsc::{self, Sender},
-        Arc, Mutex,
-    },
+use std::sync::{
+    mpsc::{self, Sender},
+    Arc, Mutex,
 };
 
-use eframe::egui::{self, Color32, DragValue, Ui};
-use egui_extras_xt::{common::WidgetShape, knobs::AudioKnob};
+use eframe::egui::{self, Color32, Ui};
 use midly::num::u4;
 use rodio::{OutputStream, OutputStreamHandle, Source};
 
@@ -163,87 +159,53 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                                 .label("Level"),
                         );
 
-                        parameter_knob(
-                            &mut cols[1],
-                            &mut handle.settings.amplitude,
-                            0.0..=1.0,
-                            "",
-                            "Level",
+                        cols[1].add(
+                            ParameterKnob::new(&mut handle.settings.transpose, -12..=12)
+                                .label("Transpose")
+                                .suffix(" st"),
                         );
                     });
                 });
 
                 cols[1].vertical_centered(|ui| {
                     ui.columns(2, |cols| {
-                        parameter_knob(
-                            &mut cols[0],
-                            &mut handle.settings.position,
-                            0.0..=1.0,
-                            "",
-                            "Position",
+                        cols[0].add(
+                            ParameterKnob::new(&mut handle.settings.position, 0.0..=1.0)
+                                .label("Position"),
                         );
 
-                        parameter_knob(
-                            &mut cols[1],
-                            &mut handle.settings.position_rand,
-                            0.0..=1.0,
-                            "",
-                            "Spray",
+                        cols[1].add(
+                            ParameterKnob::new(&mut handle.settings.position_rand, 0.0..=1.0)
+                                .label("Spray"),
                         );
                     });
 
                     ui.columns(2, |cols| {
-                        parameter_knob(
-                            &mut cols[0],
-                            &mut handle.settings.grain_size,
-                            1.0..=1000.0,
-                            " ms",
-                            "Length",
+                        cols[0].add(
+                            ParameterKnob::new(&mut handle.settings.grain_size, 1.0..=1000.0)
+                                .label("Length")
+                                .suffix(" ms"),
                         );
 
-                        parameter_knob(
-                            &mut cols[1],
-                            &mut handle.settings.density,
-                            1.0..=100.0,
-                            " Hz",
-                            "Density",
+                        cols[1].add(
+                            ParameterKnob::new(&mut handle.settings.density, 1.0..=100.0)
+                                .label("Density")
+                                .suffix(" Hz"),
                         );
                     });
                 });
 
                 cols[2].vertical_centered(|ui| {
-                    ui.columns(2, |inner_cols| {
-                        inner_cols[0].vertical_centered(|ui| {
-                            ui.add(
-                                DragValue::new(&mut handle.settings.envelope_amount)
-                                    .clamp_range(0.0..=1.0),
-                            );
-                            ui.add(
-                                AudioKnob::new(&mut handle.settings.envelope_amount)
-                                    .diameter(32.0)
-                                    .shape(WidgetShape::Circle)
-                                    .range(0.0..=1.0)
-                                    .drag_length(4.0)
-                                    .spread(0.8),
-                            );
-                            ui.label("Amount");
-                        });
+                    ui.columns(2, |cols| {
+                        cols[0].add(
+                            ParameterKnob::new(&mut handle.settings.envelope_amount, 0.0..=1.0)
+                                .label("Amount"),
+                        );
 
-                        inner_cols[1].vertical_centered(|ui| {
-                            ui.add(
-                                DragValue::new(&mut handle.settings.envelope_skew)
-                                    .clamp_range(-1.0..=1.0),
-                            );
-                            ui.add(
-                                AudioKnob::new(&mut handle.settings.envelope_skew)
-                                    .diameter(32.0)
-                                    .shape(WidgetShape::Circle)
-                                    .range(-1.0..=1.0)
-                                    .drag_length(4.0)
-                                    .spread(0.8),
-                            );
-                            ui.label("Skew");
-                        });
+                        cols[1].add(
+                            ParameterKnob::new(&mut handle.settings.envelope_skew, -1.0..=1.0)
+                                .label("Skew"),
+                        );
                     });
 
                     ui.add(EnvelopePlot::new(
@@ -322,29 +284,4 @@ fn midi_setup_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             }
         }
     }
-}
-
-fn parameter_knob(
-    ui: &mut Ui,
-    val: &mut f32,
-    range: RangeInclusive<f32>,
-    suffix: &str,
-    label: &str,
-) {
-    ui.vertical_centered(|ui| {
-        ui.add(
-            DragValue::new(val)
-                .clamp_range(range.clone())
-                .suffix(suffix),
-        );
-        ui.add(
-            AudioKnob::new(val)
-                .diameter(32.0)
-                .shape(WidgetShape::Circle)
-                .drag_length(4.0)
-                .range(range)
-                .spread(0.8),
-        );
-        ui.label(label);
-    });
 }
