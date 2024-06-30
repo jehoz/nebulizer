@@ -16,7 +16,7 @@ use crate::{
     emitter::{Emitter, EmitterMessage, EmitterSettings, KeyMode},
     midi::MidiConfig,
     widgets::{
-        envelope_plot::envelope_plot,
+        envelope_plot::EnvelopePlot,
         waveform::{Waveform, WaveformData},
     },
 };
@@ -119,10 +119,17 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 }
             });
 
-            ui.add(
-                Waveform::new(handle.waveform.clone())
-                    .playhead(handle.settings.position, handle.settings.position_rand),
-            );
+            match handle.settings.key_mode {
+                KeyMode::Pitch => {
+                    ui.add(
+                        Waveform::new(handle.waveform.clone())
+                            .playhead(handle.settings.position, handle.settings.position_rand),
+                    );
+                }
+                KeyMode::Slice(_) => {
+                    ui.add(Waveform::new(handle.waveform.clone()));
+                }
+            }
 
             match handle.settings.key_mode {
                 KeyMode::Pitch => {
@@ -207,13 +214,6 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 });
 
                 cols[2].vertical_centered(|ui| {
-                    envelope_plot(
-                        ui,
-                        handle.settings.envelope_amount,
-                        handle.settings.envelope_skew,
-                    );
-                    ui.label("Envelope");
-
                     ui.columns(2, |inner_cols| {
                         inner_cols[0].vertical_centered(|ui| {
                             ui.add(
@@ -247,6 +247,12 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                             ui.label("Skew");
                         });
                     });
+
+                    ui.add(EnvelopePlot::new(
+                        handle.settings.envelope_amount,
+                        handle.settings.envelope_skew,
+                    ));
+                    ui.label("Envelope");
                 });
             });
 
