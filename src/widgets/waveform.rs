@@ -1,5 +1,5 @@
 use eframe::{
-    egui::{pos2, vec2, Color32, Frame, Rect, Rounding, Stroke, Ui},
+    egui::{pos2, vec2, Color32, Frame, Rect, Rounding, Stroke, Ui, Widget},
     emath, epaint,
 };
 use rodio::cpal::Sample as CpalSample;
@@ -7,84 +7,118 @@ use rodio::Source;
 
 use crate::audio_clip::AudioClip;
 
-const WAVEFORM_RESOLUTION: u32 = 256;
+const WAVEFORM_RESOLUTION: usize = 256;
 
+#[derive(Clone)]
 pub struct WaveformData {
-    points: Vec<f32>,
+    points: Box<[f32]>,
 }
 
 impl WaveformData {
-    pub fn new(clip: AudioClip) -> WaveformData {
-        let mut points: Vec<f32> = vec![];
+    pub fn new(clip: AudioClip) -> Self {
         let bin_size = {
             let seconds = clip.total_duration().unwrap().as_secs_f32();
             let samples = seconds * clip.sample_rate() as f32 * clip.channels() as f32;
-            samples as u32 / WAVEFORM_RESOLUTION
+            samples as usize / WAVEFORM_RESOLUTION
         };
 
+        let mut points: [f32; WAVEFORM_RESOLUTION] = [0.0; WAVEFORM_RESOLUTION];
         let mut clip = clip.clone().convert_samples::<f32>();
-        let mut max = 0.0;
-        for _ in 0..WAVEFORM_RESOLUTION {
-            let mut acc: f32 = 0.0;
+        for i in 0..WAVEFORM_RESOLUTION {
+            let mut max = 0.0;
             for _ in 0..bin_size {
-                acc += f32::from_sample(clip.next().unwrap()).abs();
+                let val = f32::from_sample(clip.next().unwrap()).abs();
+                if val > max {
+                    max = val;
+                }
             }
-            let val = acc / bin_size as f32;
-            if val > max {
-                max = val;
-            }
-            points.push(val);
+            points[i] = max;
         }
-        points = points.iter().map(|p| p / max).collect();
 
-        WaveformData { points }
+        Self {
+            points: Box::new(points),
+        }
     }
 }
 
-pub fn waveform(ui: &mut Ui, data: &WaveformData, playhead_position: f32, playhead_range: f32) {
-    Frame::canvas(ui.style()).show(ui, |ui| {
-        let color = Color32::from_additive_luminance(196);
-        let playhead_color = Color32::from_rgba_unmultiplied(255, 183, 0, 64);
+pub struct Waveform {
+    data: WaveformData,
+    playhead: Option<(f32, f32)>,
+}
 
-        let desired_size = ui.available_width() * vec2(1.0, 0.35);
-        let (_id, rect) = ui.allocate_space(desired_size);
-
-        let to_screen =
-            emath::RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, 1.0..=-1.0), rect);
-
-        let mut shapes = vec![];
-
-        // waveform
-        let n = data.points.len();
-        for i in 0..n {
-            let x = (i as f32) / (n as f32);
-            let y = data.points[i];
-            let p1 = to_screen * pos2(x, y);
-            let p2 = to_screen * pos2(x, -y);
-            shapes.push(epaint::Shape::line_segment(
-                [p1, p2],
-                Stroke::new(1.0, color),
-            ));
+impl Waveform {
+    pub fn new(data: WaveformData) -> Self {
+        Self {
+            data,
+            playhead: None,
         }
+    }
 
-        // playhead
-        if playhead_range > 0.0 {
-            let min = (playhead_position - playhead_range / 2.0).max(0.0);
-            let max = (playhead_position + playhead_range / 2.0).min(1.0);
-            shapes.push(epaint::Shape::rect_filled(
-                Rect::from_min_max(to_screen * pos2(min, 1.0), to_screen * pos2(max, -1.0)),
-                Rounding::ZERO,
-                playhead_color,
-            ));
+    pub fn playhead(self, position: f32, range: f32) -> Self {
+        Self {
+            playhead: Some((position, range)),
+            ..self
         }
+    }
+}
 
-        shapes.push(epaint::Shape::line_segment(
-            [
-                to_screen * pos2(playhead_position, 1.0),
-                to_screen * pos2(playhead_position, -1.0),
-            ],
-            Stroke::new(2.0, playhead_color.to_opaque()),
-        ));
-        ui.painter().extend(shapes)
-    });
+impl Widget for Waveform {
+    fn ui(self, ui: &mut Ui) -> eframe::egui::Response {
+        Frame::canvas(ui.style())
+            .show(ui, |ui| {
+                let color = Color32::from_additive_luminance(196);
+                let playhead_color = Color32::from_rgba_unmultiplied(255, 183, 0, 64);
+
+                let desired_size = ui.available_width() * vec2(1.0, 0.35);
+                let (_id, rect) = ui.allocate_space(desired_size);
+
+                let bar_width = rect.width() / WAVEFORM_RESOLUTION as f32;
+
+                let to_screen = emath::RectTransform::from_to(
+                    Rect::from_x_y_ranges(0.0..=1.0, 1.0..=-1.0),
+                    rect,
+                );
+
+                let mut shapes = vec![];
+
+                // waveform
+                let n = self.data.points.len();
+                for i in 0..n {
+                    let x = (i as f32) / (n as f32);
+                    let y = self.data.points[i];
+                    let p1 = to_screen * pos2(x, y);
+                    let p2 = to_screen * pos2(x, -y);
+                    shapes.push(epaint::Shape::line_segment(
+                        [p1, p2],
+                        Stroke::new(bar_width, color),
+                    ));
+                }
+
+                // playhead
+                if let Some((position, range)) = self.playhead {
+                    if range > 0.0 {
+                        let min = (position - range / 2.0).max(0.0);
+                        let max = (position + range / 2.0).min(1.0);
+                        shapes.push(epaint::Shape::rect_filled(
+                            Rect::from_min_max(
+                                to_screen * pos2(min, 1.0),
+                                to_screen * pos2(max, -1.0),
+                            ),
+                            Rounding::ZERO,
+                            playhead_color,
+                        ));
+                    }
+
+                    shapes.push(epaint::Shape::line_segment(
+                        [
+                            to_screen * pos2(position, 1.0),
+                            to_screen * pos2(position, -1.0),
+                        ],
+                        Stroke::new(2.0, playhead_color.to_opaque()),
+                    ));
+                }
+                ui.painter().extend(shapes)
+            })
+            .response
+    }
 }

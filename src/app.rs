@@ -17,7 +17,7 @@ use crate::{
     midi::MidiConfig,
     widgets::{
         envelope_plot::envelope_plot,
-        waveform::{self, WaveformData},
+        waveform::{Waveform, WaveformData},
     },
 };
 
@@ -96,8 +96,8 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 let mut emitters = app.emitters.lock().unwrap();
                 emitters.push(handle);
                 let _ = app.stream.1.play_raw(emitter.convert_samples());
-                println!("Loaded emitter sound: {}", path.display().to_string());
             } else {
+                // TODO make some error popup window since this is only visible for one frame
                 ui.colored_label(Color32::RED, "Failed to read/decode audio file!");
             }
         }
@@ -119,11 +119,9 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 }
             });
 
-            waveform::waveform(
-                ui,
-                &handle.waveform,
-                handle.settings.position,
-                handle.settings.position_rand,
+            ui.add(
+                Waveform::new(handle.waveform.clone())
+                    .playhead(handle.settings.position, handle.settings.position_rand),
             );
 
             match handle.settings.key_mode {
@@ -305,7 +303,7 @@ fn midi_setup_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             for port in app.midi_config.ports.clone().iter() {
                 let emitters = app.emitters.clone();
                 if ui
-                    .button(app.midi_config.midi_in.port_name(&port).unwrap())
+                    .button(app.midi_config.midi_in.port_name(port).unwrap())
                     .clicked()
                 {
                     app.midi_config.connect(port, move |channel, message| {
