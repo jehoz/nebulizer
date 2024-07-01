@@ -1,4 +1,4 @@
-use std::{fs::File, io::BufReader, sync::Arc};
+use std::{fs::File, io::BufReader, sync::Arc, time::Duration};
 
 use rodio::{cpal::FromSample, Decoder, Sample, Source};
 
@@ -36,5 +36,17 @@ where
         } else {
             None
         }
+    }
+}
+
+const NANOS_PER_SEC: u64 = 1_000_000_000;
+
+impl<I> AudioClip<I>
+where
+    I: Sample,
+{
+    pub fn duration_per_sample(&self) -> Duration {
+        let ns = NANOS_PER_SEC / (self.sample_rate as u64 * self.channels as u64);
+        Duration::new(0, ns as u32)
     }
 }

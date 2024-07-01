@@ -182,7 +182,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 
                     ui.columns(2, |cols| {
                         cols[0].add(
-                            ParameterKnob::new(&mut handle.settings.grain_size, 1.0..=1000.0)
+                            ParameterKnob::new(&mut handle.settings.length_ms, 1.0..=1000.0)
                                 .label("Length")
                                 .suffix(" ms"),
                         );

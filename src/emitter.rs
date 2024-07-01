@@ -25,9 +25,7 @@ pub struct EmitterSettings {
     pub position_rand: f32,
 
     /// The length of a grain window in ms
-    pub grain_size: f32,
-    /// Amount of random deviation from of grain_size parameter
-    pub grain_size_rand: f32,
+    pub length_ms: f32,
 
     /// The number of grains played per second (in hz)
     pub density: f32,
@@ -54,8 +52,7 @@ impl Default for EmitterSettings {
             key_mode: KeyMode::Pitch,
             position: 0.0,
             position_rand: 0.0,
-            grain_size: 100.0,
-            grain_size_rand: 0.0,
+            length_ms: 100.0,
             density: 10.0,
             envelope_amount: 0.5,
             envelope_skew: 0.0,
@@ -68,7 +65,7 @@ impl Default for EmitterSettings {
 struct Note {
     velocity: u7,
     key: u7,
-    ms_since_last_grain: f32,
+    since_last_grain: Duration,
 }
 
 pub enum EmitterMessage {
@@ -90,7 +87,6 @@ where
     channel: Receiver<EmitterMessage>,
 
     notes: Vec<Note>,
-    // grains: Vec<Grain<I>>,
     grains: Vec<PitchedGrain<I>>,
 
     terminated: bool,
@@ -145,22 +141,13 @@ where
             KeyMode::Slice(_) => interval_to_ratio(self.settings.transpose),
         };
 
-        let length_sec = {
-            (if self.settings.grain_size_rand == 0.0 {
-                self.settings.grain_size
-            } else {
-                let scaled_rand = self.settings.grain_size_rand * (999.0);
-                let min = (self.settings.grain_size - scaled_rand / 2.0).max(1.0);
-                let max = (self.settings.grain_size + scaled_rand / 2.0).min(1000.0);
-                rng.gen_range(min..max)
-            }) * 0.001
-        };
+        let duration = Duration::from_secs_f32(self.settings.length_ms * 0.001);
 
         UniformSourceIterator::new(
             Grain::new(
                 self.audio_clip.clone(),
                 start,
-                Duration::from_secs_f32(length_sec),
+                duration,
                 self.settings.envelope_amount,
                 self.settings.envelope_skew,
             )
@@ -170,8 +157,8 @@ where
         )
     }
 
-    fn grain_interval_ms(&self) -> f32 {
-        1000.0 / self.settings.density
+    fn grain_interval(&self) -> Duration {
+        Duration::from_secs_f32(1.0 / self.settings.density)
     }
 
     fn handle_message(&mut self, msg: EmitterMessage) {
@@ -182,7 +169,7 @@ where
                     self.notes.push(Note {
                         velocity: vel,
                         key,
-                        ms_since_last_grain: 10000.0,
+                        since_last_grain: Duration::from_secs(100),
                     });
                 }
                 MidiMessage::NoteOff { key, .. } => {
@@ -212,15 +199,14 @@ where
         }
 
         // check each note playing and generate grains
-        let ms_per_sample = 1000.0 / (self.sample_rate() as f32 * self.channels() as f32);
         let mut notes: Vec<Note> = mem::take(&mut self.notes);
         for note in notes.iter_mut() {
-            note.ms_since_last_grain += ms_per_sample;
+            note.since_last_grain += self.audio_clip.duration_per_sample();
 
-            if note.ms_since_last_grain >= self.grain_interval_ms() {
+            if note.since_last_grain >= self.grain_interval() {
                 let g = self.make_grain(note);
                 self.grains.push(g);
-                note.ms_since_last_grain = 0.0;
+                note.since_last_grain = Duration::ZERO;
             }
         }
         self.notes = notes;

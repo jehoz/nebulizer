@@ -12,13 +12,10 @@ where
     index: usize,
     total_duration: Duration,
     elapsed_duration: Duration,
-    duration_per_sample: Duration,
 
     envelope_amount: f32,
     envelope_skew: f32,
 }
-
-const NANOS_PER_SEC: u64 = 1_000_000_000;
 
 impl<I> Grain<I>
 where
@@ -36,17 +33,11 @@ where
             (samples_per_channel as f32 * start_position) as usize * audio_clip.channels as usize
         };
 
-        let duration_per_sample = {
-            let ns = NANOS_PER_SEC / (audio_clip.sample_rate as u64 * audio_clip.channels as u64);
-            Duration::new(0, ns as u32)
-        };
-
         Grain {
             audio_clip,
             index,
             total_duration: length,
             elapsed_duration: Duration::ZERO,
-            duration_per_sample,
             envelope_amount: envelope_amount.clamp(0.0, 1.0),
             envelope_skew: envelope_skew.clamp(-1.0, 1.0),
         }
@@ -77,7 +68,7 @@ where
                 .get(self.index)
                 .map(|s| s.amplify(factor));
             self.index += 1;
-            self.elapsed_duration += self.duration_per_sample;
+            self.elapsed_duration += self.audio_clip.duration_per_sample();
             sample
         }
     }
