@@ -8,7 +8,7 @@ use midly::num::u4;
 use rodio::{OutputStream, OutputStreamHandle, Source};
 
 use crate::{
-    audio_clip::load_audio_clip,
+    audio_clip::AudioClip,
     emitter::{Emitter, EmitterMessage, EmitterSettings, KeyMode},
     midi::MidiConfig,
     widgets::{
@@ -80,7 +80,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
     if ui.button("Load new sample").clicked() {
         if let Some(path) = rfd::FileDialog::new().pick_file() {
             // attempt to load and decode audio file
-            if let Some(clip) = load_audio_clip(path.display().to_string()) {
+            if let Some(clip) = AudioClip::<f32>::load_from_file(path.display().to_string()) {
                 let (tx, rx) = mpsc::channel();
                 let emitter = Emitter::new(clip.clone(), rx);
                 let handle = EmitterHandle {
@@ -196,6 +196,11 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 });
 
                 cols[2].vertical_centered(|ui| {
+                    ui.label("Envelope");
+                    ui.add(EnvelopePlot::new(
+                        handle.settings.envelope_amount,
+                        handle.settings.envelope_skew,
+                    ));
                     ui.columns(2, |cols| {
                         cols[0].add(
                             ParameterKnob::new(&mut handle.settings.envelope_amount, 0.0..=1.0)
@@ -207,18 +212,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                                 .label("Skew"),
                         );
                     });
-
-                    ui.add(EnvelopePlot::new(
-                        handle.settings.envelope_amount,
-                        handle.settings.envelope_skew,
-                    ));
-                    ui.label("Envelope");
                 });
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("Transpose");
-                ui.add(egui::Slider::new(&mut handle.settings.transpose, -36..=36));
             });
 
             ui.push_id(e, |ui| {

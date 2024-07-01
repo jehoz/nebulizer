@@ -1,110 +1,110 @@
-use rodio::{
-    source::{Amplify, SkipDuration, Speed, TakeDuration, UniformSourceIterator},
-    Sample, Source,
-};
+use rodio::{Sample, Source};
 use std::time::Duration;
 
-use crate::window::tukey_window;
+use crate::{audio_clip::AudioClip, window::tukey_window};
 
 pub struct Grain<I>
 where
-    I: Source,
-    I::Item: Sample,
+    I: Sample,
 {
-    input: UniformSourceIterator<Speed<Amplify<TakeDuration<SkipDuration<I>>>>, I::Item>,
+    audio_clip: AudioClip<I>,
 
-    length_ns: f32,
-    elapsed_ns: f32,
+    index: usize,
+    total_duration: Duration,
+    elapsed_duration: Duration,
+    duration_per_sample: Duration,
+
     envelope_amount: f32,
     envelope_skew: f32,
 }
 
+const NANOS_PER_SEC: u64 = 1_000_000_000;
+
 impl<I> Grain<I>
 where
-    I: Clone + Source,
-    I::Item: Sample,
+    I: Sample,
 {
     pub fn new(
-        input: &I,
-        start: f32,
-        length: f32,
+        audio_clip: AudioClip<I>,
+        start_position: f32,
+        length: Duration,
         envelope_amount: f32,
         envelope_skew: f32,
-        amplitude: f32,
-        speed: f32,
     ) -> Grain<I> {
-        let skip_dur = input.total_duration().unwrap().mul_f32(start);
-        let take_dur = Duration::from_millis(1).mul_f32(length);
-        let grain = UniformSourceIterator::new(
-            input
-                .clone()
-                .skip_duration(skip_dur)
-                .take_duration(take_dur)
-                .amplify(amplitude)
-                .speed(speed),
-            input.channels(),
-            input.sample_rate(),
-        );
+        let index = {
+            let samples_per_channel = audio_clip.data.len() / audio_clip.channels as usize;
+            (samples_per_channel as f32 * start_position) as usize * audio_clip.channels as usize
+        };
+
+        let duration_per_sample = {
+            let ns = NANOS_PER_SEC / (audio_clip.sample_rate as u64 * audio_clip.channels as u64);
+            Duration::new(0, ns as u32)
+        };
 
         Grain {
-            input: grain,
-            length_ns: take_dur.as_nanos() as f32,
-            elapsed_ns: 0.0,
+            audio_clip,
+            index,
+            total_duration: length,
+            elapsed_duration: Duration::ZERO,
+            duration_per_sample,
             envelope_amount: envelope_amount.clamp(0.0, 1.0),
             envelope_skew: envelope_skew.clamp(-1.0, 1.0),
         }
-    }
-
-    pub fn done_playing(&self) -> bool {
-        self.elapsed_ns >= self.length_ns
     }
 }
 
 impl<I> Iterator for Grain<I>
 where
-    I: Source,
-    I::Item: Sample,
+    I: Sample,
 {
-    type Item = I::Item;
+    type Item = I;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let factor = tukey_window(
-            self.elapsed_ns,
-            self.length_ns,
-            self.envelope_amount,
-            self.envelope_skew,
-        );
-        self.elapsed_ns +=
-            1_000_000_000.0 / (self.input.sample_rate() as f32 * self.channels() as f32);
+        if self.elapsed_duration >= self.total_duration {
+            None
+        } else {
+            let factor = tukey_window(
+                self.elapsed_duration.as_secs_f32(),
+                self.total_duration.as_secs_f32(),
+                self.envelope_amount,
+                self.envelope_skew,
+            );
 
-        self.input.next().map(|sample| sample.amplify(factor))
+            let sample = self
+                .audio_clip
+                .data
+                .get(self.index)
+                .map(|s| s.amplify(factor));
+            self.index += 1;
+            self.elapsed_duration += self.duration_per_sample;
+            sample
+        }
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.input.size_hint()
+        (self.audio_clip.data.len(), Some(self.audio_clip.data.len()))
     }
 }
 
 impl<I> Source for Grain<I>
 where
-    I: Source,
-    I::Item: Sample,
+    I: Sample,
 {
     fn current_frame_len(&self) -> Option<usize> {
-        self.input.current_frame_len()
+        None
     }
 
     fn channels(&self) -> u16 {
-        self.input.channels()
+        self.audio_clip.channels
     }
 
     fn sample_rate(&self) -> u32 {
-        self.input.sample_rate()
+        self.audio_clip.sample_rate
     }
 
     fn total_duration(&self) -> Option<Duration> {
-        self.input.total_duration()
+        Some(self.total_duration)
     }
 }

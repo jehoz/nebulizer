@@ -2,8 +2,8 @@ use eframe::{
     egui::{pos2, vec2, Color32, Frame, Rect, Rounding, Stroke, Ui, Widget},
     emath, epaint,
 };
-use rodio::cpal::Sample as CpalSample;
-use rodio::Source;
+use rodio::cpal::FromSample;
+use rodio::{cpal::Sample as CpalSample, Sample};
 
 use crate::audio_clip::AudioClip;
 
@@ -15,19 +15,18 @@ pub struct WaveformData {
 }
 
 impl WaveformData {
-    pub fn new(clip: AudioClip) -> Self {
-        let bin_size = {
-            let seconds = clip.total_duration().unwrap().as_secs_f32();
-            let samples = seconds * clip.sample_rate() as f32 * clip.channels() as f32;
-            samples as usize / WAVEFORM_RESOLUTION
-        };
+    pub fn new<I>(clip: AudioClip<I>) -> Self
+    where
+        I: Sample,
+        f32: FromSample<I>,
+    {
+        let bin_size = clip.data.len() / WAVEFORM_RESOLUTION;
 
         let mut points: [f32; WAVEFORM_RESOLUTION] = [0.0; WAVEFORM_RESOLUTION];
-        let mut clip = clip.clone().convert_samples::<f32>();
         for i in 0..WAVEFORM_RESOLUTION {
             let mut max = 0.0;
-            for _ in 0..bin_size {
-                let val = f32::from_sample(clip.next().unwrap()).abs();
+            for j in 0..bin_size {
+                let val = f32::from_sample(clip.data[j + i * bin_size]).abs();
                 if val > max {
                     max = val;
                 }
