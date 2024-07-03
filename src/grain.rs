@@ -1,7 +1,7 @@
 use rodio::{Sample, Source};
 use std::time::Duration;
 
-use crate::{audio_clip::AudioClip, grain_envelope::GrainEnvelope};
+use crate::{audio_clip::AudioClip, envelope::GrainEnvelope};
 
 pub struct Grain<I>
 where

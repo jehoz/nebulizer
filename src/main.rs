@@ -1,8 +1,8 @@
 mod app;
 mod audio_clip;
 mod emitter;
+mod envelope;
 mod grain;
-mod grain_envelope;
 mod midi;
 mod widgets;
 

@@ -6,7 +6,11 @@ use rodio::{
 };
 use std::{mem, sync::mpsc::Receiver, time::Duration};
 
-use crate::{audio_clip::AudioClip, grain::Grain, grain_envelope::GrainEnvelope};
+use crate::{
+    audio_clip::AudioClip,
+    envelope::{AdsrEnvelope, GrainEnvelope},
+    grain::Grain,
+};
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum KeyMode {
@@ -34,7 +38,10 @@ pub struct EmitterSettings {
     pub density: f32,
 
     /// Envelope applied to each grain
-    pub envelope: GrainEnvelope,
+    pub grain_envelope: GrainEnvelope,
+
+    /// ADSR envelope applied to each note
+    pub note_envelope: AdsrEnvelope,
 
     /// Pitch transposition of input sample in semitones
     pub transpose: i32,
@@ -51,20 +58,74 @@ impl Default for EmitterSettings {
             position_rand: 0.0,
             length_ms: 100.0,
             density: 10.0,
-            envelope: GrainEnvelope {
+            grain_envelope: GrainEnvelope {
                 amount: 0.5,
                 skew: 0.0,
             },
+            note_envelope: AdsrEnvelope::default(),
             transpose: 0,
             amplitude: 1.0,
         }
     }
 }
 
-struct Note {
-    velocity: u7,
+#[derive(PartialEq)]
+enum NoteState {
+    Held(Duration),
+    Released(Duration),
+    Finished,
+}
+
+struct Note<I>
+where
+    I: Sample,
+{
     key: u7,
+    envelope: AdsrEnvelope,
+
+    state: NoteState,
+    grains: Vec<PitchedGrain<I>>,
+
     since_last_grain: Duration,
+}
+
+impl<I> Note<I>
+where
+    I: Sample,
+{
+    fn new(key: u7, envelope: AdsrEnvelope) -> Self {
+        Self {
+            key,
+            envelope,
+            state: NoteState::Held(Duration::ZERO),
+            grains: Vec::new(),
+            since_last_grain: Duration::from_secs(100),
+        }
+    }
+
+    fn update(&mut self, delta_time: Duration) {
+        self.since_last_grain += delta_time;
+        match self.state {
+            NoteState::Held(time) => self.state = NoteState::Held(time + delta_time),
+            NoteState::Released(time) => {
+                let new_time = time + delta_time;
+                if new_time.as_secs_f32() * 1000.0 >= self.envelope.release_ms {
+                    self.state = NoteState::Finished;
+                } else {
+                    self.state = NoteState::Released(new_time);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn amplitude(&self) -> f32 {
+        match self.state {
+            NoteState::Held(t) => self.envelope.held_amplitude(t),
+            NoteState::Released(t) => self.envelope.released_amplitude(t),
+            NoteState::Finished => 0.0,
+        }
+    }
 }
 
 pub enum EmitterMessage {
@@ -85,8 +146,7 @@ where
 
     channel: Receiver<EmitterMessage>,
 
-    notes: Vec<Note>,
-    grains: Vec<PitchedGrain<I>>,
+    notes: Vec<Note<I>>,
 
     terminated: bool,
 }
@@ -105,13 +165,11 @@ where
             channel,
 
             notes: Vec::new(),
-            grains: Vec::new(),
-
             terminated: false,
         }
     }
 
-    fn make_grain(&self, note: &Note) -> PitchedGrain<I> {
+    fn make_grain(&self, note: &Note<I>) -> PitchedGrain<I> {
         let mut rng = thread_rng();
 
         let start = {
@@ -147,7 +205,7 @@ where
                 self.audio_clip.clone(),
                 start,
                 duration,
-                self.settings.envelope.clone(),
+                self.settings.grain_envelope.clone(),
             )
             .speed(speed),
             self.audio_clip.channels,
@@ -163,15 +221,16 @@ where
         match msg {
             EmitterMessage::Settings(settings) => self.settings = settings,
             EmitterMessage::Midi(midi_msg) => match midi_msg {
-                MidiMessage::NoteOn { key, vel } => {
-                    self.notes.push(Note {
-                        velocity: vel,
-                        key,
-                        since_last_grain: Duration::from_secs(100),
-                    });
+                MidiMessage::NoteOn { key, .. } => {
+                    self.notes
+                        .push(Note::new(key, self.settings.note_envelope.clone()));
                 }
                 MidiMessage::NoteOff { key, .. } => {
-                    self.notes.retain(|n| n.key != key);
+                    for note in self.notes.iter_mut() {
+                        if note.key == key {
+                            note.state = NoteState::Released(Duration::ZERO);
+                        }
+                    }
                 }
                 _ => {}
             },
@@ -196,35 +255,46 @@ where
             return None;
         }
 
-        // check each note playing and generate grains
-        let mut notes: Vec<Note> = mem::take(&mut self.notes);
-        for note in notes.iter_mut() {
-            note.since_last_grain += self.audio_clip.duration_per_sample();
+        let notes = mem::take(&mut self.notes);
+        let mut live_notes = vec![];
+        let mut samples: Vec<I> = vec![];
+
+        for mut note in notes.into_iter() {
+            note.update(self.audio_clip.duration_per_sample());
+
+            if note.state == NoteState::Finished {
+                continue;
+            }
 
             if note.since_last_grain >= self.grain_interval() {
-                let g = self.make_grain(note);
-                self.grains.push(g);
+                let g = self.make_grain(&note);
+                note.grains.push(g);
                 note.since_last_grain = Duration::ZERO;
             }
-        }
-        self.notes = notes;
 
-        // mix all grain samples into one
-        let mut samples: Vec<I> = vec![];
-        let mut live_grains = vec![];
-        for mut grain in self.grains.drain(..) {
-            if let Some(sample) = grain.next() {
-                samples.push(sample);
-                live_grains.push(grain);
+            let mut note_samples = vec![];
+            let mut live_grains = vec![];
+            for mut grain in note.grains.drain(..) {
+                if let Some(sample) = grain.next() {
+                    live_grains.push(grain);
+                    note_samples.push(sample);
+                }
             }
-        }
-        self.grains.extend(live_grains);
+            note.grains.extend(live_grains);
 
-        // attenuate individual grain volume when many are playing simultaneously
-        let fac = 1.0 / ((samples.len() as f32).ln() + 1.0);
-        for s in samples.iter_mut() {
-            *s = s.amplify(fac);
+            // attenuate overlapping grains belonging to same note
+            let fac = 1.0 / ((note_samples.len() as f32).ln() + 1.0);
+            for s in note_samples.iter_mut() {
+                *s = s.amplify(fac);
+            }
+
+            if let Some(s) = note_samples.into_iter().reduce(|a, b| a.saturating_add(b)) {
+                samples.push(s.amplify(note.amplitude()));
+            }
+
+            live_notes.push(note);
         }
+        self.notes.extend(live_notes);
 
         if let Some(sample) = samples.into_iter().reduce(|a, b| a.saturating_add(b)) {
             Some(sample.amplify(self.settings.amplitude))

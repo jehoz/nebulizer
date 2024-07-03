@@ -1,4 +1,4 @@
-use crate::grain_envelope::GrainEnvelope;
+use crate::envelope::GrainEnvelope;
 
 use eframe::{
     egui::{pos2, vec2, Color32, Frame, Pos2, Rect, Ui, Widget},

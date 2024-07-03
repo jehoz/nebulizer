@@ -197,19 +197,44 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 
                 cols[2].vertical_centered(|ui| {
                     ui.label("Envelope");
-                    ui.add(EnvelopePlot::new(&handle.settings.envelope));
+                    ui.add(EnvelopePlot::new(&handle.settings.grain_envelope));
                     ui.columns(2, |cols| {
                         cols[0].add(
-                            ParameterKnob::new(&mut handle.settings.envelope.amount, 0.0..=1.0)
-                                .label("Amount"),
+                            ParameterKnob::new(
+                                &mut handle.settings.grain_envelope.amount,
+                                0.0..=1.0,
+                            )
+                            .label("Amount"),
                         );
 
                         cols[1].add(
-                            ParameterKnob::new(&mut handle.settings.envelope.skew, -1.0..=1.0)
-                                .label("Skew"),
+                            ParameterKnob::new(
+                                &mut handle.settings.grain_envelope.skew,
+                                -1.0..=1.0,
+                            )
+                            .label("Skew"),
                         );
                     });
                 });
+            });
+
+            ui.columns(4, |cols| {
+                cols[0].add(
+                    ParameterKnob::new(&mut handle.settings.note_envelope.attack_ms, 0.0..=1000.0)
+                        .label("Attack"),
+                );
+                cols[1].add(
+                    ParameterKnob::new(&mut handle.settings.note_envelope.decay_ms, 0.0..=1000.0)
+                        .label("Decay"),
+                );
+                cols[2].add(
+                    ParameterKnob::new(&mut handle.settings.note_envelope.sustain_level, 0.0..=1.0)
+                        .label("Sustain"),
+                );
+                cols[3].add(
+                    ParameterKnob::new(&mut handle.settings.note_envelope.release_ms, 0.0..=1000.0)
+                        .label("Release"),
+                );
             });
 
             ui.push_id(e, |ui| {
