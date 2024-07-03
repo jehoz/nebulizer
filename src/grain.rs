@@ -1,7 +1,7 @@
 use rodio::{Sample, Source};
 use std::time::Duration;
 
-use crate::{audio_clip::AudioClip, window::tukey_window};
+use crate::{audio_clip::AudioClip, grain_envelope::GrainEnvelope};
 
 pub struct Grain<I>
 where
@@ -13,8 +13,7 @@ where
     total_duration: Duration,
     elapsed_duration: Duration,
 
-    envelope_amount: f32,
-    envelope_skew: f32,
+    envelope: GrainEnvelope,
 }
 
 impl<I> Grain<I>
@@ -25,8 +24,7 @@ where
         audio_clip: AudioClip<I>,
         start_position: f32,
         length: Duration,
-        envelope_amount: f32,
-        envelope_skew: f32,
+        envelope: GrainEnvelope,
     ) -> Grain<I> {
         let index = {
             let samples_per_channel = audio_clip.data.len() / audio_clip.channels as usize;
@@ -38,8 +36,7 @@ where
             index,
             total_duration: length,
             elapsed_duration: Duration::ZERO,
-            envelope_amount: envelope_amount.clamp(0.0, 1.0),
-            envelope_skew: envelope_skew.clamp(-1.0, 1.0),
+            envelope,
         }
     }
 }
@@ -55,11 +52,8 @@ where
         if self.elapsed_duration >= self.total_duration {
             None
         } else {
-            let factor = tukey_window(
-                self.elapsed_duration.as_secs_f32(),
-                self.total_duration.as_secs_f32(),
-                self.envelope_amount,
-                self.envelope_skew,
+            let factor = self.envelope.amplitude_at(
+                self.elapsed_duration.as_secs_f32() / self.total_duration.as_secs_f32(),
             );
 
             let sample = self

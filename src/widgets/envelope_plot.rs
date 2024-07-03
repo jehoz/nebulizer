@@ -1,4 +1,4 @@
-use crate::window::tukey_window;
+use crate::grain_envelope::GrainEnvelope;
 
 use eframe::{
     egui::{pos2, vec2, Color32, Frame, Pos2, Rect, Ui, Widget},
@@ -6,18 +6,17 @@ use eframe::{
     epaint::{self, Stroke},
 };
 
-pub struct EnvelopePlot {
-    amount: f32,
-    skew: f32,
+pub struct EnvelopePlot<'a> {
+    envelope: &'a GrainEnvelope,
 }
 
-impl EnvelopePlot {
-    pub fn new(amount: f32, skew: f32) -> Self {
-        Self { amount, skew }
+impl<'a> EnvelopePlot<'a> {
+    pub fn new(envelope: &'a GrainEnvelope) -> Self {
+        Self { envelope }
     }
 }
 
-impl Widget for EnvelopePlot {
+impl<'a> Widget for EnvelopePlot<'a> {
     fn ui(self, ui: &mut Ui) -> eframe::egui::Response {
         Frame::canvas(ui.style())
             .show(ui, |ui| {
@@ -37,7 +36,7 @@ impl Widget for EnvelopePlot {
                 let points: Vec<Pos2> = (0..=n)
                     .map(|i| {
                         let x = i as f32 / (n as f32);
-                        let y = tukey_window(x, 1.0, self.amount, self.skew);
+                        let y = self.envelope.amplitude_at(x);
 
                         to_screen * pos2(x, y - 0.5)
                     })

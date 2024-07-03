@@ -197,18 +197,15 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 
                 cols[2].vertical_centered(|ui| {
                     ui.label("Envelope");
-                    ui.add(EnvelopePlot::new(
-                        handle.settings.envelope_amount,
-                        handle.settings.envelope_skew,
-                    ));
+                    ui.add(EnvelopePlot::new(&handle.settings.envelope));
                     ui.columns(2, |cols| {
                         cols[0].add(
-                            ParameterKnob::new(&mut handle.settings.envelope_amount, 0.0..=1.0)
+                            ParameterKnob::new(&mut handle.settings.envelope.amount, 0.0..=1.0)
                                 .label("Amount"),
                         );
 
                         cols[1].add(
-                            ParameterKnob::new(&mut handle.settings.envelope_skew, -1.0..=1.0)
+                            ParameterKnob::new(&mut handle.settings.envelope.skew, -1.0..=1.0)
                                 .label("Skew"),
                         );
                     });

@@ -2,9 +2,9 @@ mod app;
 mod audio_clip;
 mod emitter;
 mod grain;
+mod grain_envelope;
 mod midi;
 mod widgets;
-mod window;
 
 use app::NebulizerApp;
 use eframe::egui::{Style, Visuals};

@@ -6,7 +6,7 @@ use rodio::{
 };
 use std::{mem, sync::mpsc::Receiver, time::Duration};
 
-use crate::{audio_clip::AudioClip, grain::Grain};
+use crate::{audio_clip::AudioClip, grain::Grain, grain_envelope::GrainEnvelope};
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum KeyMode {
@@ -19,6 +19,9 @@ pub struct EmitterSettings {
     /// Whether MIDI keys control the pitch or the start position
     pub key_mode: KeyMode,
 
+    /// ADSR envelope applied to each midi note
+    // pub note_adsr: Adsr,
+
     /// The relative position in the source file where a grain starts
     pub position: f32,
     /// Amount of random deviation from position parameter
@@ -30,14 +33,8 @@ pub struct EmitterSettings {
     /// The number of grains played per second (in hz)
     pub density: f32,
 
-    /// Proportion of the grain window that is eased in/out
-    pub envelope_amount: f32,
-
-    /// Skews the tukey window left or right:
-    /// -1 = instant attack, long decay
-    ///  0 = symmetrical attack and decay
-    ///  1 = long attack instant decay
-    pub envelope_skew: f32,
+    /// Envelope applied to each grain
+    pub envelope: GrainEnvelope,
 
     /// Pitch transposition of input sample in semitones
     pub transpose: i32,
@@ -54,8 +51,10 @@ impl Default for EmitterSettings {
             position_rand: 0.0,
             length_ms: 100.0,
             density: 10.0,
-            envelope_amount: 0.5,
-            envelope_skew: 0.0,
+            envelope: GrainEnvelope {
+                amount: 0.5,
+                skew: 0.0,
+            },
             transpose: 0,
             amplitude: 1.0,
         }
@@ -148,8 +147,7 @@ where
                 self.audio_clip.clone(),
                 start,
                 duration,
-                self.settings.envelope_amount,
-                self.settings.envelope_skew,
+                self.settings.envelope.clone(),
             )
             .speed(speed),
             self.audio_clip.channels,
