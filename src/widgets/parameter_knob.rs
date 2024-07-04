@@ -28,7 +28,10 @@ pub struct ParameterKnob<'a> {
     get_set_value: GetSetValue<'a>,
     range: RangeInclusive<f64>,
     diameter: f32,
-    drag_speed: f32,
+    drag_speed: f64,
+    logarithmic: bool,
+    smallest_positive: f64,
+    step: f64,
     label: Option<WidgetText>,
     suffix: Option<String>,
 }
@@ -54,10 +57,25 @@ impl<'a> ParameterKnob<'a> {
             get_set_value: Box::new(get_set_value),
             range,
             diameter: 24.0,
-            drag_speed: 0.01,
+            drag_speed: 0.002,
+            logarithmic: false,
+            smallest_positive: 1e-6,
+            step: 0.0,
             label: None,
             suffix: None,
         }
+    }
+
+    #[inline]
+    pub fn logarithmic(mut self, logarithmic: bool) -> Self {
+        self.logarithmic = logarithmic;
+        self
+    }
+
+    #[inline]
+    pub fn smallest_positive(mut self, smallest_positive: f64) -> Self {
+        self.smallest_positive = smallest_positive;
+        self
     }
 
     #[inline]
@@ -83,14 +101,12 @@ impl<'a> ParameterKnob<'a> {
     fn knob_ui(&mut self, ui: &Ui, response: &mut Response) {
         if response.dragged() {
             let drag_delta = response.drag_delta();
-            let delta = self.drag_speed
-                * (drag_delta.x + drag_delta.y * -1.0)
-                * (self.range.end() - self.range.start()) as f32;
+            let delta = (self.drag_speed) * (drag_delta.x + drag_delta.y * -1.0) as f64;
 
-            let new_value = (get(&mut self.get_set_value) + delta as f64)
-                .clamp(*self.range.start(), *self.range.end());
-
-            set(&mut self.get_set_value, new_value);
+            let val = get(&mut self.get_set_value);
+            let new_pos = self.value_to_position(val, self.range.clone());
+            let new_val = self.position_to_value(new_pos + delta, self.range.clone());
+            set(&mut self.get_set_value, new_val);
             response.mark_changed();
         }
 
@@ -114,15 +130,15 @@ impl<'a> ParameterKnob<'a> {
             );
 
             let value = get(&mut self.get_set_value);
-            let value_range = (*self.range.start() as f32)..=(*self.range.end() as f32);
+            let normalized = self.value_to_position(value, self.range.clone());
             let angle_range = min_angle..=max_angle;
-            let value_angle = remap_clamp(value as f32, value_range.clone(), angle_range.clone());
+            let value_angle = remap_clamp(normalized as f32, 0.0..=1.0, angle_range.clone());
             draw_arc(
                 ui,
                 rect.center(),
                 radius,
                 Stroke::new(2.0, fg_color),
-                remap_clamp(0.0, value_range, angle_range),
+                angle_range.start().clone(),
                 value_angle,
             );
 
@@ -134,6 +150,68 @@ impl<'a> ParameterKnob<'a> {
                 Stroke::new(2.0, Color32::WHITE),
             );
             ui.painter().add(tick);
+        }
+    }
+
+    /// computes the normalized knob position [0.0, 1.0] from value in range
+    fn value_to_position(&self, value: f64, range: RangeInclusive<f64>) -> f64 {
+        let (min, max) = (*range.start(), *range.end());
+
+        if min == max {
+            0.5
+        } else if min > max {
+            1.0 - self.value_to_position(value, max..=min)
+        } else if value <= min {
+            0.0
+        } else if value >= max {
+            1.0
+        } else if self.logarithmic {
+            assert!(
+                min >= 0.0 && max > min,
+                "Logarithmic scale only implemented for positive ranges right now"
+            );
+
+            let min_log = if min <= self.smallest_positive {
+                self.smallest_positive.log10()
+            } else {
+                min.log10()
+            };
+            let max_log = max.log10();
+
+            remap_clamp(value.log10(), min_log..=max_log, 0.0..=1.0)
+        } else {
+            remap_clamp(value, range, 0.0..=1.0)
+        }
+    }
+
+    /// computes the appropriate value in range from the normalized knob position
+    fn position_to_value(&self, position: f64, range: RangeInclusive<f64>) -> f64 {
+        let (min, max) = (*range.start(), *range.end());
+
+        if min == max {
+            min
+        } else if min > max {
+            self.position_to_value(1.0 - position, max..=min)
+        } else if position <= 0.0 {
+            min
+        } else if position >= 1.0 {
+            max
+        } else if self.logarithmic {
+            assert!(
+                min >= 0.0 && max > min,
+                "Logarithmic scale only implemented for positive ranges right now"
+            );
+            let min_log = if min <= self.smallest_positive {
+                self.smallest_positive.log10()
+            } else {
+                min.log10()
+            };
+            let max_log = max.log10();
+
+            let log = lerp(min_log..=max_log, position);
+            10.0_f64.powf(log)
+        } else {
+            lerp(range, position.clamp(0.0, 1.0))
         }
     }
 }
@@ -150,7 +228,7 @@ impl<'a> Widget for ParameterKnob<'a> {
 
             let mut drag_val = DragValue::from_get_set(self.get_set_value)
                 .clamp_range(self.range.clone())
-                .speed(self.drag_speed * (self.range.end() - self.range.start()) as f32);
+                .speed(self.drag_speed * (self.range.end() - self.range.start()));
             if let Some(suffix) = &self.suffix {
                 drag_val = drag_val.suffix(suffix);
             }

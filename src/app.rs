@@ -183,12 +183,14 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     ui.columns(2, |cols| {
                         cols[0].add(
                             ParameterKnob::new(&mut handle.settings.length_ms, 1.0..=1000.0)
+                                .logarithmic(true)
                                 .label("Length")
                                 .suffix(" ms"),
                         );
 
                         cols[1].add(
                             ParameterKnob::new(&mut handle.settings.density, 1.0..=100.0)
+                                .logarithmic(true)
                                 .label("Density")
                                 .suffix(" Hz"),
                         );
@@ -220,11 +222,15 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 
             ui.columns(4, |cols| {
                 cols[0].add(
-                    ParameterKnob::new(&mut handle.settings.note_envelope.attack_ms, 0.0..=1000.0)
+                    ParameterKnob::new(&mut handle.settings.note_envelope.attack_ms, 0.0..=10000.0)
+                        .logarithmic(true)
+                        .smallest_positive(1.0)
                         .label("Attack"),
                 );
                 cols[1].add(
-                    ParameterKnob::new(&mut handle.settings.note_envelope.decay_ms, 0.0..=1000.0)
+                    ParameterKnob::new(&mut handle.settings.note_envelope.decay_ms, 0.0..=10000.0)
+                        .logarithmic(true)
+                        .smallest_positive(1.0)
                         .label("Decay"),
                 );
                 cols[2].add(
@@ -232,8 +238,13 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                         .label("Sustain"),
                 );
                 cols[3].add(
-                    ParameterKnob::new(&mut handle.settings.note_envelope.release_ms, 0.0..=1000.0)
-                        .label("Release"),
+                    ParameterKnob::new(
+                        &mut handle.settings.note_envelope.release_ms,
+                        0.0..=10000.0,
+                    )
+                    .logarithmic(true)
+                    .smallest_positive(1.0)
+                    .label("Release"),
                 );
             });
 
