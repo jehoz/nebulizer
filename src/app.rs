@@ -225,13 +225,15 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     ParameterKnob::new(&mut handle.settings.note_envelope.attack_ms, 0.0..=10000.0)
                         .logarithmic(true)
                         .smallest_positive(1.0)
-                        .label("Attack"),
+                        .label("Attack")
+                        .suffix(" ms"),
                 );
                 cols[1].add(
                     ParameterKnob::new(&mut handle.settings.note_envelope.decay_ms, 0.0..=10000.0)
                         .logarithmic(true)
                         .smallest_positive(1.0)
-                        .label("Decay"),
+                        .label("Decay")
+                        .suffix(" ms"),
                 );
                 cols[2].add(
                     ParameterKnob::new(&mut handle.settings.note_envelope.sustain_level, 0.0..=1.0)
@@ -244,7 +246,8 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     )
                     .logarithmic(true)
                     .smallest_positive(1.0)
-                    .label("Release"),
+                    .label("Release")
+                    .suffix(" ms"),
                 );
             });
 
