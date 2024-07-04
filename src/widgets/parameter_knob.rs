@@ -31,7 +31,6 @@ pub struct ParameterKnob<'a> {
     drag_speed: f64,
     logarithmic: bool,
     smallest_positive: f64,
-    step: f64,
     label: Option<WidgetText>,
     suffix: Option<String>,
 }
@@ -60,7 +59,6 @@ impl<'a> ParameterKnob<'a> {
             drag_speed: 0.002,
             logarithmic: false,
             smallest_positive: 1e-6,
-            step: 0.0,
             label: None,
             suffix: None,
         }
