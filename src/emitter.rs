@@ -1,5 +1,6 @@
 use midly::{num::u7, MidiMessage};
 use rand::{thread_rng, Rng};
+use rodio::cpal::{FromSample, Sample as CpalSample};
 use rodio::{
     source::{Speed, UniformSourceIterator},
     Sample, Source,
@@ -242,8 +243,9 @@ where
 impl<I> Iterator for Emitter<I>
 where
     I: Default + Sample,
+    f32: FromSample<I>,
 {
-    type Item = I;
+    type Item = f32;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -282,12 +284,6 @@ where
             }
             note.grains.extend(live_grains);
 
-            // attenuate overlapping grains belonging to same note
-            let fac = 1.0 / ((note_samples.len() as f32).ln() + 1.0);
-            for s in note_samples.iter_mut() {
-                *s = s.amplify(fac);
-            }
-
             if let Some(s) = note_samples.into_iter().reduce(|a, b| a.saturating_add(b)) {
                 samples.push(s.amplify(note.amplitude()));
             }
@@ -297,9 +293,11 @@ where
         self.notes.extend(live_notes);
 
         if let Some(sample) = samples.into_iter().reduce(|a, b| a.saturating_add(b)) {
-            Some(sample.amplify(self.settings.amplitude))
+            // use tanh as a very primite limiter
+            let sample = f32::from_sample(sample.amplify(self.settings.amplitude)).tanh();
+            Some(sample.to_sample())
         } else {
-            Some(I::default())
+            Some(0.0)
         }
     }
 }
@@ -307,6 +305,7 @@ where
 impl<I> Source for Emitter<I>
 where
     I: Default + Sample,
+    f32: FromSample<I>,
 {
     fn current_frame_len(&self) -> Option<usize> {
         None
