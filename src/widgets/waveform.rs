@@ -42,7 +42,7 @@ impl WaveformData {
 
 pub struct Waveform {
     data: WaveformData,
-    playhead: Option<(f32, f32)>,
+    playhead: Option<f32>,
 }
 
 impl Waveform {
@@ -53,9 +53,9 @@ impl Waveform {
         }
     }
 
-    pub fn playhead(self, position: f32, range: f32) -> Self {
+    pub fn playhead(self, position: f32) -> Self {
         Self {
-            playhead: Some((position, range)),
+            playhead: Some(position),
             ..self
         }
     }
@@ -94,25 +94,21 @@ impl Widget for Waveform {
                 }
 
                 // playhead
-                if let Some((position, range)) = self.playhead {
-                    if range > 0.0 {
-                        let min = (position - range / 2.0).max(0.0);
-                        let max = (position + range / 2.0).min(1.0);
-                        shapes.push(epaint::Shape::rect_filled(
-                            Rect::from_min_max(
-                                to_screen * pos2(min, 1.0),
-                                to_screen * pos2(max, -1.0),
-                            ),
-                            Rounding::ZERO,
-                            playhead_color,
-                        ));
-                    }
+                if let Some(start) = self.playhead {
+                    // if length > 0.0 {
+                    //     let end = (start + length).min(1.0);
+                    //     shapes.push(epaint::Shape::rect_filled(
+                    //         Rect::from_min_max(
+                    //             to_screen * pos2(start, 1.0),
+                    //             to_screen * pos2(end, -1.0),
+                    //         ),
+                    //         Rounding::ZERO,
+                    //         playhead_color,
+                    //     ));
+                    // }
 
                     shapes.push(epaint::Shape::line_segment(
-                        [
-                            to_screen * pos2(position, 1.0),
-                            to_screen * pos2(position, -1.0),
-                        ],
+                        [to_screen * pos2(start, 1.0), to_screen * pos2(start, -1.0)],
                         Stroke::new(2.0, playhead_color.to_opaque()),
                     ));
                 }
