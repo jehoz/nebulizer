@@ -298,6 +298,10 @@ fn midi_setup_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             }
         }
         None => {
+            if ui.button("Refresh").clicked() {
+                app.midi_config.refresh_ports();
+            }
+
             ui.label("Click one to connect:");
             for port in app.midi_config.ports.clone().iter() {
                 let emitters = app.emitters.clone();

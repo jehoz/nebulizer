@@ -19,6 +19,10 @@ impl MidiConfig {
         }
     }
 
+    pub fn refresh_ports(&mut self) {
+        self.ports = self.midi_in.ports()
+    }
+
     pub fn connect<F>(&mut self, port: &MidiInputPort, mut callback: F)
     where
         F: FnMut(u4, MidiMessage) + Send + 'static,
