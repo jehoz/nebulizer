@@ -119,8 +119,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             match handle.settings.key_mode {
                 KeyMode::Pitch => {
                     ui.add(
-                        Waveform::new(handle.waveform.clone())
-                            .playhead(handle.settings.position, handle.settings.position_rand),
+                        Waveform::new(handle.waveform.clone()).playhead(handle.settings.position),
                     );
                 }
                 KeyMode::Slice(_) => {
@@ -175,8 +174,11 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                         );
 
                         cols[1].add(
-                            ParameterKnob::new(&mut handle.settings.position_rand, 0.0..=1.0)
-                                .label("Spray"),
+                            ParameterKnob::new(&mut handle.settings.spray_ms, 0.0..=1000.0)
+                                .logarithmic(true)
+                                .smallest_positive(1.0)
+                                .label("Spray")
+                                .suffix(" ms"),
                         );
                     });
 

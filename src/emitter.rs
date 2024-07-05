@@ -24,13 +24,11 @@ pub struct EmitterSettings {
     /// Whether MIDI keys control the pitch or the start position
     pub key_mode: KeyMode,
 
-    /// ADSR envelope applied to each midi note
-    // pub note_adsr: Adsr,
-
     /// The relative position in the source file where a grain starts
     pub position: f32,
+
     /// Amount of random deviation from position parameter
-    pub position_rand: f32,
+    pub spray_ms: f32,
 
     /// The length of a grain window in ms
     pub length_ms: f32,
@@ -56,7 +54,7 @@ impl Default for EmitterSettings {
         EmitterSettings {
             key_mode: KeyMode::Pitch,
             position: 0.0,
-            position_rand: 0.0,
+            spray_ms: 0.0,
             length_ms: 100.0,
             density: 10.0,
             grain_envelope: GrainEnvelope {
@@ -183,9 +181,13 @@ where
                 }
             };
 
-            if self.settings.position_rand > 0.0 {
-                let min = (pos - self.settings.position_rand / 2.0).max(0.0);
-                let max = (pos + self.settings.position_rand / 2.0).min(1.0);
+            if self.settings.spray_ms > 0.0 {
+                let spray_relative = {
+                    let clip_ms = self.audio_clip.total_duration().as_secs_f32() * 1000.0;
+                    self.settings.spray_ms / clip_ms
+                };
+                let min = (pos - spray_relative / 2.0).max(0.0);
+                let max = (pos + spray_relative / 2.0).min(1.0);
                 rng.gen_range(min..max)
             } else {
                 pos

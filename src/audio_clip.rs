@@ -45,6 +45,10 @@ impl<I> AudioClip<I>
 where
     I: Sample,
 {
+    pub fn total_duration(&self) -> Duration {
+        self.duration_per_sample().mul_f64(self.data.len() as f64)
+    }
+
     pub fn duration_per_sample(&self) -> Duration {
         let ns = NANOS_PER_SEC / (self.sample_rate as u64 * self.channels as u64);
         Duration::new(0, ns as u32)
