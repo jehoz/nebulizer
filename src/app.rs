@@ -119,7 +119,8 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             match handle.settings.key_mode {
                 KeyMode::Pitch => {
                     ui.add(
-                        Waveform::new(handle.waveform.clone()).playhead(handle.settings.position),
+                        Waveform::new(handle.waveform.clone())
+                            .playhead(handle.settings.position, handle.settings.length_ms),
                     );
                 }
                 KeyMode::Slice(_) => {

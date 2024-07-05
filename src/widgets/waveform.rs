@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use eframe::{
     egui::{pos2, vec2, Color32, Frame, Rect, Rounding, Stroke, Ui, Widget},
     emath, epaint,
@@ -12,6 +14,7 @@ const WAVEFORM_RESOLUTION: usize = 256;
 #[derive(Clone)]
 pub struct WaveformData {
     points: Box<[f32]>,
+    clip_duration: Duration,
 }
 
 impl WaveformData {
@@ -36,13 +39,14 @@ impl WaveformData {
 
         Self {
             points: Box::new(points),
+            clip_duration: clip.total_duration(),
         }
     }
 }
 
 pub struct Waveform {
     data: WaveformData,
-    playhead: Option<f32>,
+    playhead: Option<(f32, f32)>,
 }
 
 impl Waveform {
@@ -53,9 +57,9 @@ impl Waveform {
         }
     }
 
-    pub fn playhead(self, position: f32) -> Self {
+    pub fn playhead(self, position: f32, length_ms: f32) -> Self {
         Self {
-            playhead: Some(position),
+            playhead: Some((position, length_ms)),
             ..self
         }
     }
@@ -94,18 +98,20 @@ impl Widget for Waveform {
                 }
 
                 // playhead
-                if let Some(start) = self.playhead {
-                    // if length > 0.0 {
-                    //     let end = (start + length).min(1.0);
-                    //     shapes.push(epaint::Shape::rect_filled(
-                    //         Rect::from_min_max(
-                    //             to_screen * pos2(start, 1.0),
-                    //             to_screen * pos2(end, -1.0),
-                    //         ),
-                    //         Rounding::ZERO,
-                    //         playhead_color,
-                    //     ));
-                    // }
+                if let Some((start, length_ms)) = self.playhead {
+                    if length_ms > 0.0 {
+                        let length_relative =
+                            length_ms / (self.data.clip_duration.as_secs_f32() * 1000.0);
+                        let end = (start + length_relative).min(1.0);
+                        shapes.push(epaint::Shape::rect_filled(
+                            Rect::from_min_max(
+                                to_screen * pos2(start, 1.0),
+                                to_screen * pos2(end, -1.0),
+                            ),
+                            Rounding::ZERO,
+                            playhead_color,
+                        ));
+                    }
 
                     shapes.push(epaint::Shape::line_segment(
                         [to_screen * pos2(start, 1.0), to_screen * pos2(start, -1.0)],
