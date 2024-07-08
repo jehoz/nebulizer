@@ -33,6 +33,16 @@ impl AdsrEnvelope {
             lerp(self.sustain_level..=0.0, released_ms / self.release_ms)
         }
     }
+
+    pub fn oneshot_amplitude(&self, since_triggered: Duration) -> f32 {
+        let attack_decay = Duration::from_secs_f32(self.attack_ms + self.decay_ms);
+
+        if since_triggered <= attack_decay {
+            self.held_amplitude(since_triggered)
+        } else {
+            self.released_amplitude(since_triggered - attack_decay)
+        }
+    }
 }
 
 impl Default for AdsrEnvelope {
