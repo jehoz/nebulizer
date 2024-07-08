@@ -17,7 +17,7 @@ use crate::{
 #[derive(Clone, PartialEq, Eq)]
 pub enum KeyMode {
     Pitch,
-    Slice(u8),
+    Slice,
 }
 
 #[derive(Clone)]
@@ -25,7 +25,10 @@ pub struct EmitterSettings {
     /// Whether MIDI keys control the pitch or the start position
     pub key_mode: KeyMode,
 
-    /// The relative position in the source file where a grain starts
+    /// Number of equal-length slices of the clip are mapped to different keys in the Slice key mode
+    pub num_slices: u8,
+
+    /// The relative position in the source file where a grain starts (in pitch mode)
     pub position: f32,
 
     /// Amount of random deviation from position parameter
@@ -57,6 +60,7 @@ impl Default for EmitterSettings {
     fn default() -> Self {
         EmitterSettings {
             key_mode: KeyMode::Pitch,
+            num_slices: 12,
             position: 0.0,
             spray_ms: 0.0,
             length_ms: 100.0,
@@ -180,9 +184,9 @@ where
             let pos = match self.settings.key_mode {
                 KeyMode::Pitch => self.settings.position,
 
-                KeyMode::Slice(num_slices) => {
-                    let slice = note.key.as_int() % num_slices;
-                    slice as f32 / num_slices as f32
+                KeyMode::Slice => {
+                    let slice = note.key.as_int() % self.settings.num_slices;
+                    slice as f32 / self.settings.num_slices as f32
                 }
             };
 
@@ -203,7 +207,7 @@ where
             KeyMode::Pitch => {
                 interval_to_ratio((note.key.as_int() as i32 + self.settings.transpose) - 60)
             }
-            KeyMode::Slice(_) => interval_to_ratio(self.settings.transpose),
+            KeyMode::Slice => interval_to_ratio(self.settings.transpose),
         };
 
         let duration = Duration::from_secs_f32(self.settings.length_ms * 0.001);
