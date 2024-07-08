@@ -5,6 +5,7 @@ use rodio::{
     source::{Speed, UniformSourceIterator},
     Sample, Source,
 };
+use std::collections::VecDeque;
 use std::{mem, sync::mpsc::Receiver, time::Duration};
 
 use crate::{
@@ -42,6 +43,9 @@ pub struct EmitterSettings {
     /// ADSR envelope applied to each note
     pub note_envelope: AdsrEnvelope,
 
+    // Number of notes that can be played simultaneously
+    pub polyphony: u32,
+
     /// Pitch transposition of input sample in semitones
     pub transpose: i32,
 
@@ -62,6 +66,7 @@ impl Default for EmitterSettings {
                 skew: 0.0,
             },
             note_envelope: AdsrEnvelope::default(),
+            polyphony: 8,
             transpose: 0,
             amplitude: 1.0,
         }
@@ -145,7 +150,7 @@ where
 
     channel: Receiver<EmitterMessage>,
 
-    notes: Vec<Note<I>>,
+    notes: VecDeque<Note<I>>,
 
     terminated: bool,
 }
@@ -163,7 +168,7 @@ where
             settings: EmitterSettings::default(),
             channel,
 
-            notes: Vec::new(),
+            notes: VecDeque::new(),
             terminated: false,
         }
     }
@@ -225,8 +230,11 @@ where
             EmitterMessage::Settings(settings) => self.settings = settings,
             EmitterMessage::Midi(midi_msg) => match midi_msg {
                 MidiMessage::NoteOn { key, .. } => {
+                    while self.settings.polyphony < self.notes.len() as u32 + 1 {
+                        self.notes.pop_front();
+                    }
                     self.notes
-                        .push(Note::new(key, self.settings.note_envelope.clone()));
+                        .push_back(Note::new(key, self.settings.note_envelope.clone()));
                 }
                 MidiMessage::NoteOff { key, .. } => {
                     for note in self.notes.iter_mut() {
@@ -295,7 +303,7 @@ where
         self.notes.extend(live_notes);
 
         if let Some(sample) = samples.into_iter().reduce(|a, b| a.saturating_add(b)) {
-            // use tanh as a very primite limiter
+            // use tanh as a primitive limiter
             let sample = f32::from_sample(sample.amplify(self.settings.amplitude)).tanh();
             Some(sample.to_sample())
         } else {
