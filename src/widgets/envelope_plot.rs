@@ -1,7 +1,7 @@
 use crate::envelope::{AdsrEnvelope, GrainEnvelope};
 
 use eframe::{
-    egui::{pos2, vec2, Color32, Frame, Rect, Ui, Widget},
+    egui::{pos2, vec2, Frame, Rect, Ui, Widget},
     emath,
     epaint::{self, Stroke},
 };
@@ -39,7 +39,8 @@ impl<'a> EnvelopePlot<'a> {
 
 impl<'a> Widget for EnvelopePlot<'a> {
     fn ui(self, ui: &mut Ui) -> eframe::egui::Response {
-        Frame::canvas(ui.style())
+        // Frame::canvas(ui.style())
+        Frame::none()
             .show(ui, |ui| {
                 let height = self.height.unwrap_or(1.0 * ui.available_width());
                 let desired_size = vec2(ui.available_width(), height);
@@ -55,9 +56,9 @@ impl<'a> Widget for EnvelopePlot<'a> {
 }
 
 fn draw_grain_envelope(ui: &mut Ui, envelope: &GrainEnvelope, rect: Rect) {
-    let color = Color32::from_white_alpha(240);
+    let color = ui.visuals().text_color();
     let to_screen =
-        emath::RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, 1.0..=-1.0), rect);
+        emath::RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, 1.25..=-0.25), rect);
 
     let n = 120;
     let points = (0..=n)
@@ -65,7 +66,7 @@ fn draw_grain_envelope(ui: &mut Ui, envelope: &GrainEnvelope, rect: Rect) {
             let x = i as f32 / (n as f32);
             let y = envelope.amplitude_at(x);
 
-            to_screen * pos2(x, y - 0.5)
+            to_screen * pos2(x, y)
         })
         .collect();
 
@@ -74,9 +75,9 @@ fn draw_grain_envelope(ui: &mut Ui, envelope: &GrainEnvelope, rect: Rect) {
 }
 
 fn draw_asdr_envelope(ui: &mut Ui, envelope: &AdsrEnvelope, rect: Rect) {
-    let color = Color32::from_white_alpha(240);
+    let color = ui.visuals().text_color();
     let to_screen =
-        emath::RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, 1.0..=0.0), rect);
+        emath::RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, 1.25..=-0.25), rect);
 
     let AdsrEnvelope {
         attack_ms,
