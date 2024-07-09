@@ -3,7 +3,7 @@ use std::sync::{
     Arc, Mutex,
 };
 
-use eframe::egui::{self, Color32, Ui};
+use eframe::egui::{self, vec2, Color32, DragValue, Frame, Ui, Vec2};
 use midly::num::u4;
 use rodio::{OutputStream, OutputStreamHandle, Source};
 
@@ -123,86 +123,135 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                             .playhead(handle.settings.position, handle.settings.length_ms),
                     );
                 }
-                KeyMode::Slice(_) => {
+                KeyMode::Slice => {
                     ui.add(Waveform::new(handle.waveform.clone()));
                 }
             }
 
             match handle.settings.key_mode {
                 KeyMode::Pitch => {
-                    if ui.button("Note => Pitch").clicked() {
-                        handle.settings.key_mode = KeyMode::Slice(12);
+                    if ui.button("PITCH").clicked() {
+                        handle.settings.key_mode = KeyMode::Slice;
                     }
                 }
-                KeyMode::Slice(num_slices) => {
-                    if ui.button("Note => Slice").clicked() {
+                KeyMode::Slice => {
+                    if ui.button("SLICE").clicked() {
                         handle.settings.key_mode = KeyMode::Pitch;
                     }
-
-                    ui.horizontal(|ui| {
-                        ui.label(format!("{} slices", num_slices));
-                        if ui.button("-").clicked() {
-                            handle.settings.key_mode = KeyMode::Slice(num_slices - 1);
-                        }
-                        if ui.button("+").clicked() {
-                            handle.settings.key_mode = KeyMode::Slice(num_slices + 1);
-                        }
-                    });
                 }
             }
 
-            ui.columns(3, |cols| {
-                cols[0].vertical_centered(|ui| {
-                    ui.columns(2, |cols| {
-                        cols[0].add(
-                            ParameterKnob::new(&mut handle.settings.amplitude, 0.0..=1.0)
-                                .label("Level"),
-                        );
+            ui.horizontal(|ui| {
+                ui.label("Level");
+                ui.add(DragValue::new(&mut handle.settings.amplitude).clamp_range(0.0..=1.0));
+            });
 
-                        cols[1].add(
-                            ParameterKnob::new(&mut handle.settings.transpose, -12..=12)
-                                .label("Transpose")
-                                .suffix(" st"),
-                        );
-                    });
-                });
+            ui.horizontal(|ui| {
+                ui.label("Transpose");
+                ui.add(
+                    DragValue::new(&mut handle.settings.transpose)
+                        .clamp_range(-12..=12)
+                        .suffix(" st"),
+                );
+            });
 
-                cols[1].vertical_centered(|ui| {
-                    ui.columns(2, |cols| {
+            ui.columns(4, |cols| {
+                match handle.settings.key_mode {
+                    KeyMode::Pitch => {
                         cols[0].add(
                             ParameterKnob::new(&mut handle.settings.position, 0.0..=1.0)
                                 .label("Position"),
                         );
+                    }
+                    KeyMode::Slice => {
+                        cols[0].add(
+                            ParameterKnob::new(&mut handle.settings.num_slices, 1..=127)
+                                .label("Slices"),
+                        );
+                    }
+                }
+                cols[1].add(
+                    ParameterKnob::new(&mut handle.settings.spray_ms, 0.0..=1000.0)
+                        .logarithmic(true)
+                        .smallest_positive(1.0)
+                        .label("Spray")
+                        .suffix(" ms"),
+                );
+                cols[2].add(
+                    ParameterKnob::new(&mut handle.settings.length_ms, 1.0..=1000.0)
+                        .logarithmic(true)
+                        .label("Length")
+                        .suffix(" ms"),
+                );
+                cols[3].add(
+                    ParameterKnob::new(&mut handle.settings.density, 1.0..=100.0)
+                        .logarithmic(true)
+                        .label("Density")
+                        .suffix(" Hz"),
+                );
+            });
 
-                        cols[1].add(
-                            ParameterKnob::new(&mut handle.settings.spray_ms, 0.0..=1000.0)
+            let plot_height = ui.available_width() / 6.0;
+            let left_width = ui.available_width() * 0.67;
+            let right_width = ui.available_width() * 0.33;
+            let frame_bg = ui.visuals().faint_bg_color;
+
+            ui.horizontal(|ui| {
+                Frame::none().fill(frame_bg).show(ui, |ui| {
+                    ui.vertical(|ui| {
+                        ui.set_width(left_width);
+                        ui.add(
+                            EnvelopePlot::from_adsr_envelope(&handle.settings.note_envelope)
+                                .set_height(plot_height),
+                        );
+                        ui.columns(4, |cols| {
+                            cols[0].add(
+                                ParameterKnob::new(
+                                    &mut handle.settings.note_envelope.attack_ms,
+                                    0.0..=10000.0,
+                                )
                                 .logarithmic(true)
                                 .smallest_positive(1.0)
-                                .label("Spray")
+                                .label("Attack")
                                 .suffix(" ms"),
-                        );
-                    });
-
-                    ui.columns(2, |cols| {
-                        cols[0].add(
-                            ParameterKnob::new(&mut handle.settings.length_ms, 1.0..=1000.0)
+                            );
+                            cols[1].add(
+                                ParameterKnob::new(
+                                    &mut handle.settings.note_envelope.decay_ms,
+                                    0.0..=10000.0,
+                                )
                                 .logarithmic(true)
-                                .label("Length")
+                                .smallest_positive(1.0)
+                                .label("Decay")
                                 .suffix(" ms"),
-                        );
-
-                        cols[1].add(
-                            ParameterKnob::new(&mut handle.settings.density, 1.0..=100.0)
+                            );
+                            cols[2].add(
+                                ParameterKnob::new(
+                                    &mut handle.settings.note_envelope.sustain_level,
+                                    0.0..=1.0,
+                                )
+                                .label("Sustain"),
+                            );
+                            cols[3].add(
+                                ParameterKnob::new(
+                                    &mut handle.settings.note_envelope.release_ms,
+                                    0.0..=10000.0,
+                                )
                                 .logarithmic(true)
-                                .label("Density")
-                                .suffix(" Hz"),
-                        );
+                                .smallest_positive(1.0)
+                                .label("Release")
+                                .suffix(" ms"),
+                            );
+                        });
                     });
                 });
 
-                cols[2].vertical_centered(|ui| {
-                    ui.label("Envelope");
-                    ui.add(EnvelopePlot::new(&handle.settings.grain_envelope));
+                ui.vertical(|ui| {
+                    ui.set_width(right_width);
+                    ui.add(
+                        EnvelopePlot::from_grain_envelope(&handle.settings.grain_envelope)
+                            .set_height(plot_height),
+                    );
                     ui.columns(2, |cols| {
                         cols[0].add(
                             ParameterKnob::new(
@@ -221,37 +270,6 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                         );
                     });
                 });
-            });
-
-            ui.columns(4, |cols| {
-                cols[0].add(
-                    ParameterKnob::new(&mut handle.settings.note_envelope.attack_ms, 0.0..=10000.0)
-                        .logarithmic(true)
-                        .smallest_positive(1.0)
-                        .label("Attack")
-                        .suffix(" ms"),
-                );
-                cols[1].add(
-                    ParameterKnob::new(&mut handle.settings.note_envelope.decay_ms, 0.0..=10000.0)
-                        .logarithmic(true)
-                        .smallest_positive(1.0)
-                        .label("Decay")
-                        .suffix(" ms"),
-                );
-                cols[2].add(
-                    ParameterKnob::new(&mut handle.settings.note_envelope.sustain_level, 0.0..=1.0)
-                        .label("Sustain"),
-                );
-                cols[3].add(
-                    ParameterKnob::new(
-                        &mut handle.settings.note_envelope.release_ms,
-                        0.0..=10000.0,
-                    )
-                    .logarithmic(true)
-                    .smallest_positive(1.0)
-                    .label("Release")
-                    .suffix(" ms"),
-                );
             });
 
             ui.push_id(e, |ui| {
