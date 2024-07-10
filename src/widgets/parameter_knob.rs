@@ -267,16 +267,25 @@ impl<'a> Widget for ParameterKnob<'a> {
                 .max_decimals_opt(self.max_decimals)
                 .speed(self.drag_speed * (self.range.end() - self.range.start()));
             if self.is_duration {
-                drag_val = drag_val.custom_formatter(|n, _| {
-                    let ms = n * 1000.0;
-                    if ms < 100.0 {
-                        format!("{ms:.1} ms")
-                    } else if ms < 1000.0 {
-                        format!("{ms:.0} ms")
-                    } else {
-                        format!("{n:.2} s")
-                    }
-                });
+                drag_val = drag_val
+                    .custom_formatter(|n, _| {
+                        let ms = n * 1000.0;
+                        if ms < 100.0 {
+                            format!("{ms:.1} ms")
+                        } else if ms < 1000.0 {
+                            format!("{ms:.0} ms")
+                        } else {
+                            format!("{n:.2} s")
+                        }
+                    })
+                    .custom_parser(|text| {
+                        text.chars()
+                            .filter(|c| !c.is_whitespace())
+                            .collect::<String>()
+                            .parse::<f64>()
+                            .map(|ms| ms / 1000.0)
+                            .ok()
+                    });
             }
             if let Some(suffix) = &self.suffix {
                 drag_val = drag_val.suffix(suffix);
