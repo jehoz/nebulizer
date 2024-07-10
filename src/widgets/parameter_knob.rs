@@ -32,6 +32,7 @@ pub struct ParameterKnob<'a> {
     smallest_positive: f64,
     label: Option<WidgetText>,
     suffix: Option<String>,
+    fill: Option<Color32>,
 
     is_duration: bool,
 }
@@ -67,6 +68,7 @@ impl<'a> ParameterKnob<'a> {
             smallest_positive: 1e-6,
             label: None,
             suffix: None,
+            fill: None,
             is_duration: false,
         }
     }
@@ -94,6 +96,12 @@ impl<'a> ParameterKnob<'a> {
         self.suffix = Some(suffix.to_string());
         self
     }
+
+    #[inline]
+    pub fn fill(mut self, color: Color32) -> Self {
+        self.fill = Some(color);
+        self
+    }
 }
 
 impl<'a> ParameterKnob<'a> {
@@ -117,8 +125,9 @@ impl<'a> ParameterKnob<'a> {
 
         let rect = response.rect;
         if ui.is_rect_visible(rect) {
-            let bg_color = Color32::from_rgb(96, 96, 96);
-            let fg_color = Color32::from_rgb(80, 157, 239);
+            let bg_color = ui.visuals().weak_text_color();
+            let tick_color = ui.visuals().text_color();
+            let fill_color = self.fill.unwrap_or(ui.visuals().selection.bg_fill);
 
             let rot_padding = 0.2;
             let radius = self.diameter / 2.0;
@@ -129,7 +138,7 @@ impl<'a> ParameterKnob<'a> {
                 ui,
                 rect.center(),
                 radius,
-                Stroke::new(3.0, bg_color),
+                Stroke::new(2.0, bg_color),
                 min_angle,
                 max_angle,
             );
@@ -142,7 +151,7 @@ impl<'a> ParameterKnob<'a> {
                 ui,
                 rect.center(),
                 radius,
-                Stroke::new(2.0, fg_color),
+                Stroke::new(2.0, fill_color),
                 angle_range.start().clone(),
                 value_angle,
             );
@@ -152,7 +161,7 @@ impl<'a> ParameterKnob<'a> {
                     rect.center(),
                     rect.center() + Vec2::angled(PI / 2.0 + value_angle) * radius,
                 ],
-                Stroke::new(2.0, Color32::WHITE),
+                Stroke::new(2.0, tick_color),
             );
             ui.painter().add(tick);
         }
