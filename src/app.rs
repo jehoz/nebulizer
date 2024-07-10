@@ -37,6 +37,8 @@ pub struct NebulizerApp {
     active_panel: GuiPanel,
 
     emitters: Arc<Mutex<Vec<EmitterHandle>>>,
+
+    theme: catppuccin_egui::Theme,
 }
 
 impl NebulizerApp {
@@ -49,6 +51,7 @@ impl NebulizerApp {
             midi_config: MidiConfig::new(),
             active_panel: GuiPanel::Emitters,
             emitters: Arc::new(Mutex::new(Vec::new())),
+            theme: catppuccin_egui::LATTE,
         }
     }
 }
@@ -60,6 +63,8 @@ enum GuiPanel {
 
 impl eframe::App for NebulizerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        catppuccin_egui::set_theme(ctx, self.theme);
+
         egui::TopBottomPanel::top("menu bar").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 if ui.button("Emitters").clicked() {
