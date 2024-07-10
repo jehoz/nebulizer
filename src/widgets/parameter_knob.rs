@@ -3,13 +3,12 @@ use std::{
     ops::RangeInclusive,
 };
 
-use eframe::{
-    egui::{
-        lerp, remap_clamp, Color32, DragValue, Pos2, Response, Sense, Shape, Stroke, Ui, Vec2,
-        Widget, WidgetText,
-    },
-    emath,
+use eframe::egui::{
+    lerp, remap_clamp, Color32, DragValue, Pos2, Response, Sense, Shape, Stroke, Ui, Vec2, Widget,
+    WidgetText,
 };
+
+use crate::numeric::Numeric;
 
 const ARC_RESOLUTION: usize = 32;
 
@@ -33,19 +32,25 @@ pub struct ParameterKnob<'a> {
     smallest_positive: f64,
     label: Option<WidgetText>,
     suffix: Option<String>,
+
+    is_duration: bool,
 }
 
 impl<'a> ParameterKnob<'a> {
-    pub fn new<Num: emath::Numeric>(value: &'a mut Num, range: RangeInclusive<Num>) -> Self {
+    pub fn new<Num: Numeric>(value: &'a mut Num, range: RangeInclusive<Num>) -> Self {
         let range_f64 = range.start().to_f64()..=range.end().to_f64();
-        let s = Self::from_get_set(range_f64, move |v: Option<f64>| {
+        let mut knob = Self::from_get_set(range_f64, move |v: Option<f64>| {
             if let Some(v) = v {
                 *value = Num::from_f64(v);
             }
             value.to_f64()
         });
 
-        s
+        if Num::DURATION {
+            knob.is_duration = true;
+        }
+
+        knob
     }
 
     pub fn from_get_set(
@@ -61,6 +66,7 @@ impl<'a> ParameterKnob<'a> {
             smallest_positive: 1e-6,
             label: None,
             suffix: None,
+            is_duration: false,
         }
     }
 
@@ -227,6 +233,18 @@ impl<'a> Widget for ParameterKnob<'a> {
             let mut drag_val = DragValue::from_get_set(self.get_set_value)
                 .clamp_range(self.range.clone())
                 .speed(self.drag_speed * (self.range.end() - self.range.start()));
+            if self.is_duration {
+                drag_val = drag_val.custom_formatter(|n, _| {
+                    let ms = n * 1000.0;
+                    if ms < 100.0 {
+                        format!("{ms:.1} ms")
+                    } else if ms < 1000.0 {
+                        format!("{ms:.0} ms")
+                    } else {
+                        format!("{n:.2} s")
+                    }
+                });
+            }
             if let Some(suffix) = &self.suffix {
                 drag_val = drag_val.suffix(suffix);
             }
