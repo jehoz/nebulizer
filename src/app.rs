@@ -139,9 +139,6 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             );
 
             ui.horizontal(|ui| {
-                ui.label("Level");
-                ui.add(DragValue::new(&mut handle.settings.amplitude).clamp_range(0.0..=1.0));
-                ui.separator();
                 ui.label("Transpose");
                 ui.add(
                     DragValue::new(&mut handle.settings.transpose)
@@ -152,7 +149,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 
             ui.separator();
 
-            ui.columns(5, |cols| {
+            ui.columns(6, |cols| {
                 cols[0].vertical_centered_justified(|ui| {
                     ui.selectable_value(&mut handle.settings.key_mode, KeyMode::Pitch, "Pitch");
                     ui.selectable_value(&mut handle.settings.key_mode, KeyMode::Slice, "Slice");
@@ -195,6 +192,12 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                         .max_decimals(2)
                         .label("Density")
                         .suffix(" Hz"),
+                );
+
+                cols[5].add(
+                    ParameterKnob::new(&mut handle.settings.amplitude, 0.0..=1.0)
+                        .max_decimals(2)
+                        .label("Level"),
                 );
             });
 
