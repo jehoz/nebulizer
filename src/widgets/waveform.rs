@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use eframe::{
-    egui::{pos2, vec2, Color32, Frame, Rect, Rounding, Stroke, Ui, Widget},
+    egui::{pos2, vec2, Frame, Rect, Rounding, Stroke, Ui, Widget},
     emath, epaint,
 };
 use rodio::cpal::FromSample;
