@@ -131,25 +131,10 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 }
             }
 
-            match handle.settings.key_mode {
-                KeyMode::Pitch => {
-                    if ui.button("PITCH").clicked() {
-                        handle.settings.key_mode = KeyMode::Slice;
-                    }
-                }
-                KeyMode::Slice => {
-                    if ui.button("SLICE").clicked() {
-                        handle.settings.key_mode = KeyMode::Pitch;
-                    }
-                }
-            }
-
             ui.horizontal(|ui| {
                 ui.label("Level");
                 ui.add(DragValue::new(&mut handle.settings.amplitude).clamp_range(0.0..=1.0));
-            });
-
-            ui.horizontal(|ui| {
+                ui.separator();
                 ui.label("Transpose");
                 ui.add(
                     DragValue::new(&mut handle.settings.transpose)
@@ -158,22 +143,29 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 );
             });
 
-            ui.columns(4, |cols| {
+            ui.separator();
+
+            ui.columns(5, |cols| {
+                cols[0].vertical_centered_justified(|ui| {
+                    ui.selectable_value(&mut handle.settings.key_mode, KeyMode::Pitch, "Pitch");
+                    ui.selectable_value(&mut handle.settings.key_mode, KeyMode::Slice, "Slice");
+                });
+
                 match handle.settings.key_mode {
                     KeyMode::Pitch => {
-                        cols[0].add(
+                        cols[1].add(
                             ParameterKnob::new(&mut handle.settings.position, 0.0..=1.0)
                                 .label("Position"),
                         );
                     }
                     KeyMode::Slice => {
-                        cols[0].add(
+                        cols[1].add(
                             ParameterKnob::new(&mut handle.settings.num_slices, 1..=127)
                                 .label("Slices"),
                         );
                     }
                 }
-                cols[1].add(
+                cols[2].add(
                     ParameterKnob::new(
                         &mut handle.settings.spray,
                         Duration::ZERO..=Duration::from_secs(1),
@@ -181,7 +173,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     .logarithmic(true)
                     .label("Spray"),
                 );
-                cols[2].add(
+                cols[3].add(
                     ParameterKnob::new(
                         &mut handle.settings.length,
                         Duration::ZERO..=Duration::from_secs(1),
@@ -189,7 +181,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     .logarithmic(true)
                     .label("Length"),
                 );
-                cols[3].add(
+                cols[4].add(
                     ParameterKnob::new(&mut handle.settings.density, 1.0..=100.0)
                         .logarithmic(true)
                         .label("Density")
@@ -197,9 +189,16 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 );
             });
 
+            ui.separator();
+
             let plot_height = ui.available_width() / 6.0;
-            let left_width = ui.available_width() * 0.67;
-            let right_width = ui.available_width() * 0.33;
+            let (left_width, right_width) = {
+                let spacing = ui.spacing();
+                let item_space = spacing.item_spacing.x;
+                let margin = spacing.window_margin.left + spacing.window_margin.right;
+                let width = ui.available_width() - (margin + item_space);
+                (width * 0.67, width * 0.33)
+            };
 
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
@@ -243,6 +242,8 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     });
                 });
 
+                ui.separator();
+
                 ui.vertical(|ui| {
                     ui.set_width(right_width);
                     ui.add(
@@ -268,6 +269,8 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     });
                 });
             });
+
+            ui.separator();
 
             ui.push_id(e, |ui| {
                 egui::ComboBox::from_label("MIDI Channel")
