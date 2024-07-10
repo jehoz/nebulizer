@@ -39,16 +39,19 @@ impl<'a> EnvelopePlot<'a> {
 
 impl<'a> Widget for EnvelopePlot<'a> {
     fn ui(self, ui: &mut Ui) -> eframe::egui::Response {
-        // Frame::canvas(ui.style())
         Frame::none()
+            .fill(ui.visuals().extreme_bg_color)
+            .stroke(Stroke::new(1.0, ui.visuals().faint_bg_color))
             .show(ui, |ui| {
                 let height = self.height.unwrap_or(1.0 * ui.available_width());
                 let desired_size = vec2(ui.available_width(), height);
                 let (_id, rect) = ui.allocate_space(desired_size);
 
+                let inner_rect = rect.shrink(2.0);
+
                 match self.envelope {
-                    Envelope::Grain(env) => draw_grain_envelope(ui, env, rect),
-                    Envelope::Adsr(env) => draw_asdr_envelope(ui, env, rect),
+                    Envelope::Grain(env) => draw_grain_envelope(ui, env, inner_rect),
+                    Envelope::Adsr(env) => draw_asdr_envelope(ui, env, inner_rect),
                 }
             })
             .response
@@ -70,7 +73,7 @@ fn draw_grain_envelope(ui: &mut Ui, envelope: &GrainEnvelope, rect: Rect) {
         })
         .collect();
 
-    let line = epaint::Shape::line(points, Stroke::new(1.0, color));
+    let line = epaint::Shape::line(points, Stroke::new(2.0, color));
     ui.painter().add(line);
 }
 
@@ -94,6 +97,6 @@ fn draw_asdr_envelope(ui: &mut Ui, envelope: &AdsrEnvelope, rect: Rect) {
         to_screen * pos2(1.0, 0.0),
     ];
 
-    let line = epaint::Shape::line(points, Stroke::new(1.0, color));
+    let line = epaint::Shape::line(points, Stroke::new(2.0, color));
     ui.painter().add(line);
 }
