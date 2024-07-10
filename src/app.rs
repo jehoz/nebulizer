@@ -124,17 +124,19 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 }
             });
 
-            match handle.settings.key_mode {
+            let playheads = match handle.settings.key_mode {
                 KeyMode::Pitch => {
-                    ui.add(
-                        Waveform::new(handle.waveform.clone())
-                            .playhead(handle.settings.position, handle.settings.length),
-                    );
+                    vec![handle.settings.position]
                 }
-                KeyMode::Slice => {
-                    ui.add(Waveform::new(handle.waveform.clone()));
-                }
-            }
+                KeyMode::Slice => (0..handle.settings.num_slices)
+                    .map(|i| i as f32 / handle.settings.num_slices as f32)
+                    .collect(),
+            };
+            ui.add(
+                Waveform::new(handle.waveform.clone())
+                    .playheads(playheads)
+                    .grain_length(handle.settings.length),
+            );
 
             ui.horizontal(|ui| {
                 ui.label("Level");
