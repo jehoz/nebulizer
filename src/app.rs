@@ -179,7 +179,6 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                         Duration::ZERO..=Duration::from_secs(1),
                     )
                     .logarithmic(true)
-                    .smallest_positive(0.001)
                     .label("Spray"),
                 );
                 cols[2].add(
@@ -188,7 +187,6 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                         Duration::ZERO..=Duration::from_secs(1),
                     )
                     .logarithmic(true)
-                    .smallest_positive(0.001)
                     .label("Length"),
                 );
                 cols[3].add(
@@ -217,7 +215,6 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                                 Duration::ZERO..=Duration::from_secs(10),
                             )
                             .logarithmic(true)
-                            .smallest_positive(0.001)
                             .label("Attack"),
                         );
                         cols[1].add(
@@ -226,7 +223,6 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                                 Duration::ZERO..=Duration::from_secs(10),
                             )
                             .logarithmic(true)
-                            .smallest_positive(0.001)
                             .label("Decay"),
                         );
                         cols[2].add(
@@ -242,7 +238,6 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                                 Duration::ZERO..=Duration::from_secs(10),
                             )
                             .logarithmic(true)
-                            .smallest_positive(0.001)
                             .label("Release"),
                         );
                     });

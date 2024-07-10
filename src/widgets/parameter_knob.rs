@@ -48,6 +48,7 @@ impl<'a> ParameterKnob<'a> {
 
         if Num::DURATION {
             knob.is_duration = true;
+            knob.smallest_positive = 0.001;
         }
 
         knob
