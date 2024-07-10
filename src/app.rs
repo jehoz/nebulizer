@@ -213,23 +213,21 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     ui.columns(4, |cols| {
                         cols[0].add(
                             ParameterKnob::new(
-                                &mut handle.settings.note_envelope.attack_ms,
-                                0.0..=10000.0,
+                                &mut handle.settings.note_envelope.attack,
+                                Duration::ZERO..=Duration::from_secs(10),
                             )
                             .logarithmic(true)
-                            .smallest_positive(1.0)
-                            .label("Attack")
-                            .suffix(" ms"),
+                            .smallest_positive(0.001)
+                            .label("Attack"),
                         );
                         cols[1].add(
                             ParameterKnob::new(
-                                &mut handle.settings.note_envelope.decay_ms,
-                                0.0..=10000.0,
+                                &mut handle.settings.note_envelope.decay,
+                                Duration::ZERO..=Duration::from_secs(10),
                             )
                             .logarithmic(true)
-                            .smallest_positive(1.0)
-                            .label("Decay")
-                            .suffix(" ms"),
+                            .smallest_positive(0.001)
+                            .label("Decay"),
                         );
                         cols[2].add(
                             ParameterKnob::new(
@@ -240,13 +238,12 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                         );
                         cols[3].add(
                             ParameterKnob::new(
-                                &mut handle.settings.note_envelope.release_ms,
-                                0.0..=10000.0,
+                                &mut handle.settings.note_envelope.release,
+                                Duration::ZERO..=Duration::from_secs(10),
                             )
                             .logarithmic(true)
-                            .smallest_positive(1.0)
-                            .label("Release")
-                            .suffix(" ms"),
+                            .smallest_positive(0.001)
+                            .label("Release"),
                         );
                     });
                 });

@@ -117,7 +117,7 @@ where
             NoteState::Held(time) => self.state = NoteState::Held(time + delta_time),
             NoteState::Released(time) => {
                 let new_time = time + delta_time;
-                if new_time.as_secs_f32() * 1000.0 >= self.envelope.release_ms {
+                if new_time >= self.envelope.release {
                     self.state = NoteState::Finished;
                 } else {
                     self.state = NoteState::Released(new_time);
