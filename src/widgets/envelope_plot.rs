@@ -47,7 +47,7 @@ impl<'a> Widget for EnvelopePlot<'a> {
                 let desired_size = vec2(ui.available_width(), height);
                 let (_id, rect) = ui.allocate_space(desired_size);
 
-                let inner_rect = rect.shrink(2.0);
+                let inner_rect = rect.shrink2(vec2(2.0, 8.0));
 
                 match self.envelope {
                     Envelope::Grain(env) => draw_grain_envelope(ui, env, inner_rect),
@@ -61,7 +61,7 @@ impl<'a> Widget for EnvelopePlot<'a> {
 fn draw_grain_envelope(ui: &mut Ui, envelope: &GrainEnvelope, rect: Rect) {
     let color = ui.visuals().text_color();
     let to_screen =
-        emath::RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, 1.25..=-0.25), rect);
+        emath::RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, 1.0..=0.0), rect);
 
     let n = 120;
     let points = (0..=n)
@@ -80,7 +80,7 @@ fn draw_grain_envelope(ui: &mut Ui, envelope: &GrainEnvelope, rect: Rect) {
 fn draw_asdr_envelope(ui: &mut Ui, envelope: &AdsrEnvelope, rect: Rect) {
     let color = ui.visuals().text_color();
     let to_screen =
-        emath::RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, 1.25..=-0.25), rect);
+        emath::RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, 1.0..=0.0), rect);
 
     let AdsrEnvelope {
         attack,
@@ -96,6 +96,10 @@ fn draw_asdr_envelope(ui: &mut Ui, envelope: &AdsrEnvelope, rect: Rect) {
         to_screen * pos2((*attack + *decay).as_secs_f32() / total_sec, *sustain_level),
         to_screen * pos2(1.0, 0.0),
     ];
+
+    for point in points.iter() {
+        ui.painter().circle_filled(*point, 2.0, color);
+    }
 
     let line = epaint::Shape::line(points, Stroke::new(2.0, color));
     ui.painter().add(line);
