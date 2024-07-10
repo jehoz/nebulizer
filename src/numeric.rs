@@ -25,10 +25,12 @@ impl Numeric for Duration {
 
     const MAX: Self = Duration::MAX;
 
+    #[inline]
     fn to_f64(self) -> f64 {
         self.as_secs_f64()
     }
 
+    #[inline]
     fn from_f64(num: f64) -> Self {
         Duration::from_secs_f64(num)
     }
