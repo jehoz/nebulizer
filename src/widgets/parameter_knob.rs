@@ -30,6 +30,8 @@ pub struct ParameterKnob<'a> {
     drag_speed: f64,
     logarithmic: bool,
     smallest_positive: f64,
+    min_decimals: usize,
+    max_decimals: Option<usize>,
     label: Option<WidgetText>,
     suffix: Option<String>,
     fill: Option<Color32>,
@@ -46,6 +48,11 @@ impl<'a> ParameterKnob<'a> {
             }
             value.to_f64()
         });
+
+        if Num::INTEGRAL {
+            knob.smallest_positive = 1.0;
+            knob.max_decimals = Some(0);
+        }
 
         if Num::DURATION {
             knob.is_duration = true;
@@ -66,6 +73,8 @@ impl<'a> ParameterKnob<'a> {
             drag_speed: 0.002,
             logarithmic: false,
             smallest_positive: 1e-6,
+            min_decimals: 0,
+            max_decimals: None,
             label: None,
             suffix: None,
             fill: None,
@@ -82,6 +91,18 @@ impl<'a> ParameterKnob<'a> {
     #[inline]
     pub fn smallest_positive(mut self, smallest_positive: f64) -> Self {
         self.smallest_positive = smallest_positive;
+        self
+    }
+
+    #[inline]
+    pub fn min_decimals(mut self, decimals: usize) -> Self {
+        self.min_decimals = decimals;
+        self
+    }
+
+    #[inline]
+    pub fn max_decimals(mut self, decimals: usize) -> Self {
+        self.max_decimals = Some(decimals);
         self
     }
 
@@ -242,6 +263,8 @@ impl<'a> Widget for ParameterKnob<'a> {
 
             let mut drag_val = DragValue::from_get_set(self.get_set_value)
                 .clamp_range(self.range.clone())
+                .min_decimals(self.min_decimals)
+                .max_decimals_opt(self.max_decimals)
                 .speed(self.drag_speed * (self.range.end() - self.range.start()));
             if self.is_duration {
                 drag_val = drag_val.custom_formatter(|n, _| {

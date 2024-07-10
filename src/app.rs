@@ -162,6 +162,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     KeyMode::Pitch => {
                         cols[1].add(
                             ParameterKnob::new(&mut handle.settings.position, 0.0..=1.0)
+                                .max_decimals(2)
                                 .label("Position"),
                         );
                     }
@@ -191,6 +192,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 cols[4].add(
                     ParameterKnob::new(&mut handle.settings.density, 1.0..=100.0)
                         .logarithmic(true)
+                        .max_decimals(2)
                         .label("Density")
                         .suffix(" Hz"),
                 );
@@ -236,6 +238,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                                 &mut handle.settings.note_envelope.sustain_level,
                                 0.0..=1.0,
                             )
+                            .max_decimals(2)
                             .label("Sustain"),
                         );
                         cols[3].add(
@@ -263,6 +266,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                                 &mut handle.settings.grain_envelope.amount,
                                 0.0..=1.0,
                             )
+                            .max_decimals(2)
                             .label("Amount"),
                         );
 
@@ -271,6 +275,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                                 &mut handle.settings.grain_envelope.skew,
                                 -1.0..=1.0,
                             )
+                            .max_decimals(2)
                             .label("Skew"),
                         );
                     });
