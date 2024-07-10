@@ -46,7 +46,7 @@ impl WaveformData {
 
 pub struct Waveform {
     data: WaveformData,
-    playhead: Option<(f32, f32)>,
+    playhead: Option<(f32, Duration)>,
 }
 
 impl Waveform {
@@ -57,9 +57,9 @@ impl Waveform {
         }
     }
 
-    pub fn playhead(self, position: f32, length_ms: f32) -> Self {
+    pub fn playhead(self, position: f32, length: Duration) -> Self {
         Self {
-            playhead: Some((position, length_ms)),
+            playhead: Some((position, length)),
             ..self
         }
     }
@@ -98,10 +98,10 @@ impl Widget for Waveform {
                 }
 
                 // playhead
-                if let Some((start, length_ms)) = self.playhead {
-                    if length_ms > 0.0 {
+                if let Some((start, length)) = self.playhead {
+                    if length > Duration::ZERO {
                         let length_relative =
-                            length_ms / (self.data.clip_duration.as_secs_f32() * 1000.0);
+                            length.as_secs_f32() / self.data.clip_duration.as_secs_f32();
                         let end = (start + length_relative).min(1.0);
                         shapes.push(epaint::Shape::rect_filled(
                             Rect::from_min_max(

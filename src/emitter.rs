@@ -32,10 +32,10 @@ pub struct EmitterSettings {
     pub position: f32,
 
     /// Amount of random deviation from position parameter
-    pub spray_ms: f32,
+    pub spray: Duration,
 
     /// The length of a grain window in ms
-    pub length_ms: f32,
+    pub length: Duration,
 
     /// The number of grains played per second (in hz)
     pub density: f32,
@@ -62,8 +62,8 @@ impl Default for EmitterSettings {
             key_mode: KeyMode::Pitch,
             num_slices: 12,
             position: 0.0,
-            spray_ms: 0.0,
-            length_ms: 100.0,
+            spray: Duration::ZERO,
+            length: Duration::from_millis(100),
             density: 10.0,
             grain_envelope: GrainEnvelope {
                 amount: 0.5,
@@ -190,10 +190,11 @@ where
                 }
             };
 
-            if self.settings.spray_ms > 0.0 {
+            if self.settings.spray > Duration::ZERO {
                 let spray_relative = {
-                    let clip_ms = self.audio_clip.total_duration().as_secs_f32() * 1000.0;
-                    self.settings.spray_ms / clip_ms
+                    let spray = self.settings.spray.as_secs_f32();
+                    let clip = self.audio_clip.total_duration().as_secs_f32();
+                    spray / clip
                 };
                 let min = (pos - spray_relative / 2.0).max(0.0);
                 let max = (pos + spray_relative / 2.0).min(1.0);
@@ -210,13 +211,11 @@ where
             KeyMode::Slice => interval_to_ratio(self.settings.transpose),
         };
 
-        let duration = Duration::from_secs_f32(self.settings.length_ms * 0.001);
-
         UniformSourceIterator::new(
             Grain::new(
                 self.audio_clip.clone(),
                 start,
-                duration,
+                self.settings.length,
                 self.settings.grain_envelope.clone(),
             )
             .speed(speed),

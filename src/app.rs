@@ -1,9 +1,12 @@
-use std::sync::{
-    mpsc::{self, Sender},
-    Arc, Mutex,
+use std::{
+    sync::{
+        mpsc::{self, Sender},
+        Arc, Mutex,
+    },
+    time::Duration,
 };
 
-use eframe::egui::{self, vec2, Color32, DragValue, Frame, Ui, Vec2};
+use eframe::egui::{self, Color32, DragValue, Ui};
 use midly::num::u4;
 use rodio::{OutputStream, OutputStreamHandle, Source};
 
@@ -120,7 +123,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 KeyMode::Pitch => {
                     ui.add(
                         Waveform::new(handle.waveform.clone())
-                            .playhead(handle.settings.position, handle.settings.length_ms),
+                            .playhead(handle.settings.position, handle.settings.length),
                     );
                 }
                 KeyMode::Slice => {
@@ -171,17 +174,22 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     }
                 }
                 cols[1].add(
-                    ParameterKnob::new(&mut handle.settings.spray_ms, 0.0..=1000.0)
-                        .logarithmic(true)
-                        .smallest_positive(1.0)
-                        .label("Spray")
-                        .suffix(" ms"),
+                    ParameterKnob::new(
+                        &mut handle.settings.spray,
+                        Duration::ZERO..=Duration::from_secs(1),
+                    )
+                    .logarithmic(true)
+                    .smallest_positive(0.001)
+                    .label("Spray"),
                 );
                 cols[2].add(
-                    ParameterKnob::new(&mut handle.settings.length_ms, 1.0..=1000.0)
-                        .logarithmic(true)
-                        .label("Length")
-                        .suffix(" ms"),
+                    ParameterKnob::new(
+                        &mut handle.settings.length,
+                        Duration::ZERO..=Duration::from_secs(1),
+                    )
+                    .logarithmic(true)
+                    .smallest_positive(0.001)
+                    .label("Length"),
                 );
                 cols[3].add(
                     ParameterKnob::new(&mut handle.settings.density, 1.0..=100.0)
@@ -194,55 +202,52 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             let plot_height = ui.available_width() / 6.0;
             let left_width = ui.available_width() * 0.67;
             let right_width = ui.available_width() * 0.33;
-            let frame_bg = ui.visuals().faint_bg_color;
 
             ui.horizontal(|ui| {
-                Frame::none().fill(frame_bg).show(ui, |ui| {
-                    ui.vertical(|ui| {
-                        ui.set_width(left_width);
-                        ui.add(
-                            EnvelopePlot::from_adsr_envelope(&handle.settings.note_envelope)
-                                .set_height(plot_height),
+                ui.vertical(|ui| {
+                    ui.set_width(left_width);
+                    ui.add(
+                        EnvelopePlot::from_adsr_envelope(&handle.settings.note_envelope)
+                            .set_height(plot_height),
+                    );
+                    ui.columns(4, |cols| {
+                        cols[0].add(
+                            ParameterKnob::new(
+                                &mut handle.settings.note_envelope.attack_ms,
+                                0.0..=10000.0,
+                            )
+                            .logarithmic(true)
+                            .smallest_positive(1.0)
+                            .label("Attack")
+                            .suffix(" ms"),
                         );
-                        ui.columns(4, |cols| {
-                            cols[0].add(
-                                ParameterKnob::new(
-                                    &mut handle.settings.note_envelope.attack_ms,
-                                    0.0..=10000.0,
-                                )
-                                .logarithmic(true)
-                                .smallest_positive(1.0)
-                                .label("Attack")
-                                .suffix(" ms"),
-                            );
-                            cols[1].add(
-                                ParameterKnob::new(
-                                    &mut handle.settings.note_envelope.decay_ms,
-                                    0.0..=10000.0,
-                                )
-                                .logarithmic(true)
-                                .smallest_positive(1.0)
-                                .label("Decay")
-                                .suffix(" ms"),
-                            );
-                            cols[2].add(
-                                ParameterKnob::new(
-                                    &mut handle.settings.note_envelope.sustain_level,
-                                    0.0..=1.0,
-                                )
-                                .label("Sustain"),
-                            );
-                            cols[3].add(
-                                ParameterKnob::new(
-                                    &mut handle.settings.note_envelope.release_ms,
-                                    0.0..=10000.0,
-                                )
-                                .logarithmic(true)
-                                .smallest_positive(1.0)
-                                .label("Release")
-                                .suffix(" ms"),
-                            );
-                        });
+                        cols[1].add(
+                            ParameterKnob::new(
+                                &mut handle.settings.note_envelope.decay_ms,
+                                0.0..=10000.0,
+                            )
+                            .logarithmic(true)
+                            .smallest_positive(1.0)
+                            .label("Decay")
+                            .suffix(" ms"),
+                        );
+                        cols[2].add(
+                            ParameterKnob::new(
+                                &mut handle.settings.note_envelope.sustain_level,
+                                0.0..=1.0,
+                            )
+                            .label("Sustain"),
+                        );
+                        cols[3].add(
+                            ParameterKnob::new(
+                                &mut handle.settings.note_envelope.release_ms,
+                                0.0..=10000.0,
+                            )
+                            .logarithmic(true)
+                            .smallest_positive(1.0)
+                            .label("Release")
+                            .suffix(" ms"),
+                        );
                     });
                 });
 
