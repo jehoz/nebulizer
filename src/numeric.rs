@@ -7,6 +7,9 @@ pub trait Numeric: Clone + Copy + PartialEq + PartialOrd + 'static {
     /// Is this an integer type?
     const INTEGRAL: bool;
 
+    /// Is this a duration?
+    const DURATION: bool;
+
     /// Smallest finite value
     const MIN: Self;
 
@@ -20,6 +23,7 @@ pub trait Numeric: Clone + Copy + PartialEq + PartialOrd + 'static {
 
 impl Numeric for Duration {
     const INTEGRAL: bool = false;
+    const DURATION: bool = true;
 
     const MIN: Self = Duration::ZERO;
 
@@ -40,6 +44,7 @@ macro_rules! impl_from_emath {
     ($t: ident) => {
         impl Numeric for $t {
             const INTEGRAL: bool = <Self as emath::Numeric>::INTEGRAL;
+            const DURATION: bool = false;
             const MIN: Self = <Self as emath::Numeric>::MIN;
             const MAX: Self = <Self as emath::Numeric>::MAX;
 
