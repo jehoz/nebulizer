@@ -1,6 +1,7 @@
 use midly::{num::u7, MidiMessage};
 use rand::{thread_rng, Rng};
 use rodio::cpal::{FromSample, Sample as CpalSample};
+use rodio::source::Amplify;
 use rodio::{
     source::{Speed, UniformSourceIterator},
     Sample, Source,
@@ -84,29 +85,21 @@ enum NoteState {
     Finished,
 }
 
-struct Note<I>
-where
-    I: Sample,
-{
+struct Note {
     key: u7,
     envelope: AdsrEnvelope,
 
     state: NoteState,
-    grains: Vec<PitchedGrain<I>>,
 
     since_last_grain: Duration,
 }
 
-impl<I> Note<I>
-where
-    I: Sample,
-{
+impl Note {
     fn new(key: u7, envelope: AdsrEnvelope) -> Self {
         Self {
             key,
             envelope,
             state: NoteState::Held(Duration::ZERO),
-            grains: Vec::new(),
             since_last_grain: Duration::from_secs(100),
         }
     }
@@ -142,7 +135,7 @@ pub enum EmitterMessage {
     Terminate,
 }
 
-type PitchedGrain<I> = UniformSourceIterator<Speed<Grain<I>>, I>;
+type PitchedGrain<I> = UniformSourceIterator<Speed<Amplify<Grain<I>>>, I>;
 
 pub struct Emitter<I>
 where
@@ -154,7 +147,8 @@ where
 
     channel: Receiver<EmitterMessage>,
 
-    notes: VecDeque<Note<I>>,
+    notes: VecDeque<Note>,
+    grains: Vec<PitchedGrain<I>>,
 
     terminated: bool,
 }
@@ -173,11 +167,12 @@ where
             channel,
 
             notes: VecDeque::new(),
+            grains: Vec::new(),
             terminated: false,
         }
     }
 
-    fn make_grain(&self, note: &Note<I>) -> PitchedGrain<I> {
+    fn make_grain(&self, note: &Note) -> PitchedGrain<I> {
         let mut rng = thread_rng();
 
         let start = {
@@ -218,6 +213,7 @@ where
                 self.settings.length,
                 self.settings.grain_envelope.clone(),
             )
+            .amplify(note.amplitude())
             .speed(speed),
             self.audio_clip.channels,
             self.audio_clip.sample_rate,
@@ -272,8 +268,6 @@ where
 
         let notes = mem::take(&mut self.notes);
         let mut live_notes = vec![];
-        let mut samples: Vec<I> = vec![];
-
         for mut note in notes.into_iter() {
             note.update(self.audio_clip.duration_per_sample());
 
@@ -283,27 +277,23 @@ where
 
             if note.since_last_grain >= self.grain_interval() {
                 let g = self.make_grain(&note);
-                note.grains.push(g);
+                self.grains.push(g);
                 note.since_last_grain = Duration::ZERO;
-            }
-
-            let mut note_samples = vec![];
-            let mut live_grains = vec![];
-            for mut grain in note.grains.drain(..) {
-                if let Some(sample) = grain.next() {
-                    live_grains.push(grain);
-                    note_samples.push(sample);
-                }
-            }
-            note.grains.extend(live_grains);
-
-            if let Some(s) = note_samples.into_iter().reduce(|a, b| a.saturating_add(b)) {
-                samples.push(s.amplify(note.amplitude()));
             }
 
             live_notes.push(note);
         }
         self.notes.extend(live_notes);
+
+        let mut samples = vec![];
+        let mut live_grains = vec![];
+        for mut grain in self.grains.drain(..) {
+            if let Some(sample) = grain.next() {
+                live_grains.push(grain);
+                samples.push(sample);
+            }
+        }
+        self.grains.extend(live_grains);
 
         if let Some(sample) = samples.into_iter().reduce(|a, b| a.saturating_add(b)) {
             // use tanh as a primitive limiter
