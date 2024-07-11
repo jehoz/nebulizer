@@ -139,6 +139,11 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             );
 
             ui.horizontal(|ui| {
+                ui.label("Polyphony");
+                ui.add(DragValue::new(&mut handle.settings.polyphony).clamp_range(1..=64));
+
+                ui.separator();
+
                 ui.label("Transpose");
                 ui.add(
                     DragValue::new(&mut handle.settings.transpose)
