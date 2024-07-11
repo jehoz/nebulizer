@@ -34,7 +34,7 @@ pub struct EmitterSettings {
     /// Amount of random deviation from position parameter
     pub spray: Duration,
 
-    /// The length of a grain window in ms
+    /// The length of a grain window
     pub length: Duration,
 
     /// The number of grains played per second (in hz)
