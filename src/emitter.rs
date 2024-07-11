@@ -142,10 +142,11 @@ where
     I: Sample,
 {
     audio_clip: AudioClip<I>,
+    current_audio_channel: u16,
 
     pub settings: EmitterSettings,
 
-    channel: Receiver<EmitterMessage>,
+    msg_receiver: Receiver<EmitterMessage>,
 
     notes: VecDeque<Note>,
     grains: Vec<PitchedGrain<I>>,
@@ -163,8 +164,9 @@ where
     {
         Emitter {
             audio_clip,
+            current_audio_channel: 0,
             settings: EmitterSettings::default(),
-            channel,
+            msg_receiver: channel,
 
             notes: VecDeque::new(),
             grains: Vec::new(),
@@ -258,7 +260,7 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        while let Ok(msg) = self.channel.try_recv() {
+        while let Ok(msg) = self.msg_receiver.try_recv() {
             self.handle_message(msg);
         }
 
@@ -266,24 +268,32 @@ where
             return None;
         }
 
-        let notes = mem::take(&mut self.notes);
-        let mut live_notes = vec![];
-        for mut note in notes.into_iter() {
-            note.update(self.audio_clip.duration_per_sample());
+        // only update notes (and potentially create new grains) at the beginning of an interleaved
+        // sequence.  this prevents grains from being created with their channels "out of sync"
+        if self.current_audio_channel == 0 {
+            let notes = mem::take(&mut self.notes);
+            let mut live_notes = vec![];
+            for mut note in notes.into_iter() {
+                note.update(
+                    self.audio_clip
+                        .duration_per_sample()
+                        .mul_f32(self.audio_clip.channels as f32),
+                );
 
-            if note.state == NoteState::Finished {
-                continue;
+                if note.state == NoteState::Finished {
+                    continue;
+                }
+
+                if note.since_last_grain >= self.grain_interval() {
+                    let g = self.make_grain(&note);
+                    self.grains.push(g);
+                    note.since_last_grain = Duration::ZERO;
+                }
+
+                live_notes.push(note);
             }
-
-            if note.since_last_grain >= self.grain_interval() {
-                let g = self.make_grain(&note);
-                self.grains.push(g);
-                note.since_last_grain = Duration::ZERO;
-            }
-
-            live_notes.push(note);
+            self.notes.extend(live_notes);
         }
-        self.notes.extend(live_notes);
 
         let mut samples = vec![];
         let mut live_grains = vec![];
@@ -294,6 +304,8 @@ where
             }
         }
         self.grains.extend(live_grains);
+
+        self.current_audio_channel = (self.current_audio_channel + 1) % self.channels();
 
         if let Some(sample) = samples.into_iter().reduce(|a, b| a.saturating_add(b)) {
             // use tanh as a primitive limiter
