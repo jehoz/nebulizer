@@ -10,6 +10,8 @@ catppuccin-egui = { version = "5.1", default-features = false, features = ["egui
 eframe = "0.27.2"
 midir = "0.10.0"
 midly = "0.5.3"
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", features = ["assert_process_allocs", "standalone"] }
+nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug.git" }
 rand = "0.8.5"
 rfd = "0.14.1"
 rodio = "0.18.1"
