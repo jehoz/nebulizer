@@ -52,7 +52,7 @@ impl AdsrEnvelope {
 impl Default for AdsrEnvelope {
     fn default() -> Self {
         Self {
-            attack: Duration::from_millis(1),
+            attack: Duration::ZERO,
             decay: Duration::from_millis(1000),
             sustain_level: 1.0,
             release: Duration::from_millis(15),
