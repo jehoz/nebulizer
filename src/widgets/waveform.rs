@@ -13,7 +13,7 @@ const WAVEFORM_RESOLUTION: usize = 216;
 
 #[derive(Clone)]
 pub struct WaveformData {
-    points: Box<[f32]>,
+    points: Box<[(f32, f32)]>,
     clip_duration: Duration,
 }
 
@@ -25,16 +25,20 @@ impl WaveformData {
     {
         let bin_size = clip.data.len() / WAVEFORM_RESOLUTION;
 
-        let mut points: [f32; WAVEFORM_RESOLUTION] = [0.0; WAVEFORM_RESOLUTION];
+        let mut points: [(f32, f32); WAVEFORM_RESOLUTION] = [(0.0, 0.0); WAVEFORM_RESOLUTION];
         for i in 0..WAVEFORM_RESOLUTION {
             let mut max = 0.0;
+            let mut min = 0.0;
             for j in 0..bin_size {
-                let val = f32::from_sample(clip.data[j + i * bin_size]).abs();
+                let val = f32::from_sample(clip.data[j + i * bin_size]);
                 if val > max {
                     max = val;
                 }
+                if val < min {
+                    min = val;
+                }
             }
-            points[i] = max;
+            points[i] = (min, max);
         }
 
         Self {
@@ -106,9 +110,9 @@ impl Widget for Waveform {
                 let n = self.data.points.len();
                 for i in 0..n {
                     let x = (i as f32) / (n as f32);
-                    let y = self.data.points[i];
-                    let p1 = to_screen * pos2(x, y);
-                    let p2 = to_screen * pos2(x, -y);
+                    let (min, max) = self.data.points[i];
+                    let p1 = to_screen * pos2(x, max);
+                    let p2 = to_screen * pos2(x, min);
                     shapes.push(epaint::Shape::line_segment(
                         [p1, p2],
                         Stroke::new(bar_width, waveform_color),
