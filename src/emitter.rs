@@ -6,7 +6,7 @@ use rodio::{
     source::{Speed, UniformSourceIterator},
     Sample, Source,
 };
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::{mem, sync::mpsc::Receiver, time::Duration};
 
 use crate::{
@@ -128,6 +128,24 @@ impl Note {
         }
     }
 }
+
+/// All emitter parameters that can be controlled with MIDI CC messages
+pub enum ControlParam {
+    Position,
+    NumSlices,
+    Spray,
+    Length,
+    Density,
+    GrainEnvelopeAmount,
+    GrainEnvelopeSkew,
+    NoteEnvelopeAttack,
+    NoteEnvelopeDecay,
+    NoteEnvelope,
+    Transpose,
+    Amplitude,
+}
+
+type MidiControlMap = HashMap<u7, ControlParam>;
 
 pub enum EmitterMessage {
     Settings(EmitterSettings),
