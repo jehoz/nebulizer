@@ -8,7 +8,7 @@ use eframe::egui::{
     WidgetText,
 };
 
-use crate::numeric::Numeric;
+use crate::{numeric::Numeric, params::Parameter};
 
 const ARC_RESOLUTION: usize = 32;
 
@@ -80,6 +80,10 @@ impl<'a> ParameterKnob<'a> {
             fill: None,
             is_duration: false,
         }
+    }
+
+    pub fn from_param<Num: Numeric>(param: &'a mut Parameter<Num>) -> Self {
+        Self::new(&mut param.value, param.range.clone())
     }
 
     #[inline]

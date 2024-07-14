@@ -1,9 +1,24 @@
-use std::time::Duration;
+use std::{ops::RangeInclusive, time::Duration};
 
 use midly::num::u7;
 use strum_macros::{Display, VariantArray};
 
 use crate::envelope::{AdsrEnvelope, GrainEnvelope};
+
+#[derive(Clone)]
+pub struct Parameter<I> {
+    pub value: I,
+    pub range: RangeInclusive<I>,
+}
+
+impl<I> Parameter<I> {
+    fn new(default: I, range: RangeInclusive<I>) -> Self {
+        Self {
+            value: default,
+            range,
+        }
+    }
+}
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum KeyMode {
