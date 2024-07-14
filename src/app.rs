@@ -15,7 +15,7 @@ use crate::{
     audio_clip::AudioClip,
     emitter::{Emitter, EmitterMessage},
     midi::MidiConfig,
-    params::{ControlParam, EmitterSettings, KeyMode},
+    params::{ControlParam, EmitterParams, KeyMode},
     widgets::{
         envelope_plot::EnvelopePlot,
         parameter_knob::ParameterKnob,
@@ -25,7 +25,7 @@ use crate::{
 
 pub struct EmitterHandle {
     pub track_name: String,
-    pub settings: EmitterSettings,
+    pub params: EmitterParams,
     pub waveform: Option<WaveformData>,
     pub msg_sender: Option<Sender<EmitterMessage>>,
 }
@@ -34,7 +34,7 @@ impl Default for EmitterHandle {
     fn default() -> Self {
         Self {
             track_name: "".to_string(),
-            settings: EmitterSettings::default(),
+            params: EmitterParams::default(),
             waveform: None,
             msg_sender: None,
         }
@@ -130,12 +130,12 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         ui.monospace(&handle.track_name);
     });
 
-    let playheads = match handle.settings.key_mode {
+    let playheads = match handle.params.key_mode {
         KeyMode::Pitch => {
-            vec![handle.settings.position]
+            vec![handle.params.position]
         }
-        KeyMode::Slice => (0..handle.settings.num_slices)
-            .map(|i| i as f32 / handle.settings.num_slices as f32)
+        KeyMode::Slice => (0..handle.params.num_slices)
+            .map(|i| i as f32 / handle.params.num_slices as f32)
             .collect(),
     };
 
@@ -144,7 +144,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         ui.add(
             Waveform::new(waveform.clone())
                 .playheads(playheads)
-                .grain_length(handle.settings.length)
+                .grain_length(handle.params.length)
                 .desired_size(waveform_size),
         );
     } else {
@@ -159,13 +159,13 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 
     ui.horizontal(|ui| {
         ui.label("Polyphony");
-        ui.add(DragValue::new(&mut handle.settings.polyphony).clamp_range(1..=64));
+        ui.add(DragValue::new(&mut handle.params.polyphony).clamp_range(1..=64));
 
         ui.separator();
 
         ui.label("Transpose");
         ui.add(
-            DragValue::new(&mut handle.settings.transpose)
+            DragValue::new(&mut handle.params.transpose)
                 .clamp_range(-12..=12)
                 .suffix(" st"),
         );
@@ -175,27 +175,27 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 
     ui.columns(6, |cols| {
         cols[0].vertical_centered_justified(|ui| {
-            ui.selectable_value(&mut handle.settings.key_mode, KeyMode::Pitch, "Pitch");
-            ui.selectable_value(&mut handle.settings.key_mode, KeyMode::Slice, "Slice");
+            ui.selectable_value(&mut handle.params.key_mode, KeyMode::Pitch, "Pitch");
+            ui.selectable_value(&mut handle.params.key_mode, KeyMode::Slice, "Slice");
         });
 
-        match handle.settings.key_mode {
+        match handle.params.key_mode {
             KeyMode::Pitch => {
                 cols[1].add(
-                    ParameterKnob::new(&mut handle.settings.position, 0.0..=1.0)
+                    ParameterKnob::new(&mut handle.params.position, 0.0..=1.0)
                         .max_decimals(2)
                         .label("Position"),
                 );
             }
             KeyMode::Slice => {
                 cols[1].add(
-                    ParameterKnob::new(&mut handle.settings.num_slices, 1..=127).label("Slices"),
+                    ParameterKnob::new(&mut handle.params.num_slices, 1..=127).label("Slices"),
                 );
             }
         }
         cols[2].add(
             ParameterKnob::new(
-                &mut handle.settings.spray,
+                &mut handle.params.spray,
                 Duration::ZERO..=Duration::from_secs(1),
             )
             .logarithmic(true)
@@ -203,14 +203,14 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         );
         cols[3].add(
             ParameterKnob::new(
-                &mut handle.settings.length,
+                &mut handle.params.length,
                 Duration::ZERO..=Duration::from_secs(1),
             )
             .logarithmic(true)
             .label("Length"),
         );
         cols[4].add(
-            ParameterKnob::new(&mut handle.settings.density, 1.0..=100.0)
+            ParameterKnob::new(&mut handle.params.density, 1.0..=100.0)
                 .logarithmic(true)
                 .max_decimals(2)
                 .label("Density")
@@ -218,7 +218,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         );
 
         cols[5].add(
-            ParameterKnob::new(&mut handle.settings.amplitude, 0.0..=1.0)
+            ParameterKnob::new(&mut handle.params.amplitude, 0.0..=1.0)
                 .max_decimals(2)
                 .label("Level"),
         );
@@ -239,13 +239,13 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         ui.vertical(|ui| {
             ui.set_width(left_width);
             ui.add(
-                EnvelopePlot::from_adsr_envelope(&handle.settings.note_envelope)
+                EnvelopePlot::from_adsr_envelope(&handle.params.note_envelope)
                     .set_height(plot_height),
             );
             ui.columns(4, |cols| {
                 cols[0].add(
                     ParameterKnob::new(
-                        &mut handle.settings.note_envelope.attack,
+                        &mut handle.params.note_envelope.attack,
                         Duration::ZERO..=Duration::from_secs(10),
                     )
                     .logarithmic(true)
@@ -253,20 +253,20 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 );
                 cols[1].add(
                     ParameterKnob::new(
-                        &mut handle.settings.note_envelope.decay,
+                        &mut handle.params.note_envelope.decay,
                         Duration::ZERO..=Duration::from_secs(10),
                     )
                     .logarithmic(true)
                     .label("Decay"),
                 );
                 cols[2].add(
-                    ParameterKnob::new(&mut handle.settings.note_envelope.sustain_level, 0.0..=1.0)
+                    ParameterKnob::new(&mut handle.params.note_envelope.sustain_level, 0.0..=1.0)
                         .max_decimals(2)
                         .label("Sustain"),
                 );
                 cols[3].add(
                     ParameterKnob::new(
-                        &mut handle.settings.note_envelope.release,
+                        &mut handle.params.note_envelope.release,
                         Duration::ZERO..=Duration::from_secs(10),
                     )
                     .logarithmic(true)
@@ -280,18 +280,18 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         ui.vertical(|ui| {
             ui.set_width(right_width);
             ui.add(
-                EnvelopePlot::from_grain_envelope(&handle.settings.grain_envelope)
+                EnvelopePlot::from_grain_envelope(&handle.params.grain_envelope)
                     .set_height(plot_height),
             );
             ui.columns(2, |cols| {
                 cols[0].add(
-                    ParameterKnob::new(&mut handle.settings.grain_envelope.amount, 0.0..=1.0)
+                    ParameterKnob::new(&mut handle.params.grain_envelope.amount, 0.0..=1.0)
                         .max_decimals(2)
                         .label("Amount"),
                 );
 
                 cols[1].add(
-                    ParameterKnob::new(&mut handle.settings.grain_envelope.skew, -1.0..=1.0)
+                    ParameterKnob::new(&mut handle.params.grain_envelope.skew, -1.0..=1.0)
                         .max_decimals(2)
                         .label("Skew"),
                 );
@@ -300,7 +300,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
     });
 
     if let Some(sender) = &handle.msg_sender {
-        let _ = sender.send(EmitterMessage::Settings(handle.settings.clone()));
+        let _ = sender.send(EmitterMessage::Params(handle.params.clone()));
     }
 }
 
@@ -362,7 +362,7 @@ fn settings_panel(app: &mut NebulizerApp, ui: &mut Ui) {
     ui.label("MIDI CC");
     let mut handle = app.emitter.lock().unwrap();
     let mut to_delete = None;
-    for (e, (cc, param)) in handle.settings.midi_cc_map.iter_mut().enumerate() {
+    for (e, (cc, param)) in handle.params.midi_cc_map.iter_mut().enumerate() {
         ui.horizontal(|ui| {
             ComboBox::from_id_source(format!("cc-{e}"))
                 .selected_text(format!("CC {}", cc))
@@ -387,12 +387,12 @@ fn settings_panel(app: &mut NebulizerApp, ui: &mut Ui) {
     }
 
     if let Some(idx) = to_delete {
-        let _ = handle.settings.midi_cc_map.remove(idx);
+        let _ = handle.params.midi_cc_map.remove(idx);
     }
 
     if ui.button("+").clicked() {
         handle
-            .settings
+            .params
             .midi_cc_map
             .push((0.into(), ControlParam::Position));
     }

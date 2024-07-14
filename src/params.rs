@@ -12,7 +12,7 @@ pub enum KeyMode {
 }
 
 #[derive(Clone)]
-pub struct EmitterSettings {
+pub struct EmitterParams {
     pub midi_cc_map: MidiControlMap,
 
     /// Whether MIDI keys control the pitch or the start position
@@ -49,9 +49,9 @@ pub struct EmitterSettings {
     pub amplitude: f32,
 }
 
-impl Default for EmitterSettings {
+impl Default for EmitterParams {
     fn default() -> Self {
-        EmitterSettings {
+        EmitterParams {
             midi_cc_map: Vec::new(),
             key_mode: KeyMode::Pitch,
             num_slices: 12,

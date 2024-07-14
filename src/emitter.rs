@@ -9,7 +9,7 @@ use rodio::{
 use std::collections::VecDeque;
 use std::{mem, sync::mpsc::Receiver, time::Duration};
 
-use crate::params::{EmitterSettings, KeyMode};
+use crate::params::{EmitterParams, KeyMode};
 use crate::{audio_clip::AudioClip, envelope::AdsrEnvelope, grain::Grain};
 
 #[derive(PartialEq)]
@@ -64,7 +64,7 @@ impl Note {
 }
 
 pub enum EmitterMessage {
-    Settings(EmitterSettings),
+    Params(EmitterParams),
     Midi(MidiMessage),
     Terminate,
 }
@@ -78,7 +78,7 @@ where
     audio_clip: AudioClip<I>,
     current_audio_channel: u16,
 
-    pub settings: EmitterSettings,
+    pub settings: EmitterParams,
 
     msg_receiver: Receiver<EmitterMessage>,
 
@@ -99,7 +99,7 @@ where
         Emitter {
             audio_clip: audio_clip.clone(),
             current_audio_channel: 0,
-            settings: EmitterSettings::default(),
+            settings: EmitterParams::default(),
             msg_receiver,
 
             notes: VecDeque::new(),
@@ -163,7 +163,7 @@ where
 
     fn handle_message(&mut self, msg: EmitterMessage) {
         match msg {
-            EmitterMessage::Settings(settings) => self.settings = settings,
+            EmitterMessage::Params(settings) => self.settings = settings,
             EmitterMessage::Midi(midi_msg) => match midi_msg {
                 MidiMessage::NoteOn { key, .. } => {
                     while self.settings.polyphony < self.notes.len() as u32 + 1 {
