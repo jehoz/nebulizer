@@ -5,10 +5,11 @@ mod envelope;
 mod grain;
 mod midi;
 mod numeric;
+mod params;
 mod widgets;
 
 use app::NebulizerApp;
-use eframe::egui::{Style, Vec2, Visuals};
+use eframe::egui::Vec2;
 
 fn main() {
     let app = NebulizerApp::new();

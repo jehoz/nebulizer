@@ -8,79 +8,9 @@ use rodio::{
 };
 use std::collections::VecDeque;
 use std::{mem, sync::mpsc::Receiver, time::Duration};
-use strum_macros::{Display, VariantArray};
 
-use crate::{
-    audio_clip::AudioClip,
-    envelope::{AdsrEnvelope, GrainEnvelope},
-    grain::Grain,
-};
-
-#[derive(Clone, PartialEq, Eq)]
-pub enum KeyMode {
-    Pitch,
-    Slice,
-}
-
-#[derive(Clone)]
-pub struct EmitterSettings {
-    pub midi_cc_map: MidiControlMap,
-
-    /// Whether MIDI keys control the pitch or the start position
-    pub key_mode: KeyMode,
-
-    /// Number of equal-length slices of the clip are mapped to different keys in the Slice key mode
-    pub num_slices: u8,
-
-    /// The relative position in the source file where a grain starts (in pitch mode)
-    pub position: f32,
-
-    /// Amount of random deviation from position parameter
-    pub spray: Duration,
-
-    /// The length of a grain window
-    pub length: Duration,
-
-    /// The number of grains played per second (in hz)
-    pub density: f32,
-
-    /// Envelope applied to each grain
-    pub grain_envelope: GrainEnvelope,
-
-    /// ADSR envelope applied to each note
-    pub note_envelope: AdsrEnvelope,
-
-    // Number of notes that can be played simultaneously
-    pub polyphony: u32,
-
-    /// Pitch transposition of input sample in semitones
-    pub transpose: i32,
-
-    /// The volume level of sound coming out of the emitter, relative to the original audio sample
-    pub amplitude: f32,
-}
-
-impl Default for EmitterSettings {
-    fn default() -> Self {
-        EmitterSettings {
-            midi_cc_map: Vec::new(),
-            key_mode: KeyMode::Pitch,
-            num_slices: 12,
-            position: 0.0,
-            spray: Duration::ZERO,
-            length: Duration::from_millis(100),
-            density: 10.0,
-            grain_envelope: GrainEnvelope {
-                amount: 0.5,
-                skew: 0.0,
-            },
-            note_envelope: AdsrEnvelope::default(),
-            polyphony: 8,
-            transpose: 0,
-            amplitude: 1.0,
-        }
-    }
-}
+use crate::params::{EmitterSettings, KeyMode};
+use crate::{audio_clip::AudioClip, envelope::AdsrEnvelope, grain::Grain};
 
 #[derive(PartialEq)]
 enum NoteState {
@@ -132,25 +62,6 @@ impl Note {
         }
     }
 }
-
-/// All emitter parameters that can be controlled with MIDI CC messages
-#[derive(Clone, Display, VariantArray, PartialEq)]
-pub enum ControlParam {
-    Position,
-    NumSlices,
-    Spray,
-    Length,
-    Density,
-    GrainEnvelopeAmount,
-    GrainEnvelopeSkew,
-    NoteEnvelopeAttack,
-    NoteEnvelopeDecay,
-    NoteEnvelope,
-    Transpose,
-    Amplitude,
-}
-
-type MidiControlMap = Vec<(u7, ControlParam)>;
 
 pub enum EmitterMessage {
     Settings(EmitterSettings),

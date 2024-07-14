@@ -13,8 +13,9 @@ use strum::VariantArray;
 
 use crate::{
     audio_clip::AudioClip,
-    emitter::{ControlParam, Emitter, EmitterMessage, EmitterSettings, KeyMode},
+    emitter::{Emitter, EmitterMessage},
     midi::MidiConfig,
+    params::{ControlParam, EmitterSettings, KeyMode},
     widgets::{
         envelope_plot::EnvelopePlot,
         parameter_knob::ParameterKnob,
