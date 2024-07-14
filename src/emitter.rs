@@ -6,8 +6,9 @@ use rodio::{
     source::{Speed, UniformSourceIterator},
     Sample, Source,
 };
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::{mem, sync::mpsc::Receiver, time::Duration};
+use strum_macros::{Display, VariantArray};
 
 use crate::{
     audio_clip::AudioClip,
@@ -23,6 +24,8 @@ pub enum KeyMode {
 
 #[derive(Clone)]
 pub struct EmitterSettings {
+    pub midi_cc_map: MidiControlMap,
+
     /// Whether MIDI keys control the pitch or the start position
     pub key_mode: KeyMode,
 
@@ -60,6 +63,7 @@ pub struct EmitterSettings {
 impl Default for EmitterSettings {
     fn default() -> Self {
         EmitterSettings {
+            midi_cc_map: Vec::new(),
             key_mode: KeyMode::Pitch,
             num_slices: 12,
             position: 0.0,
@@ -130,6 +134,7 @@ impl Note {
 }
 
 /// All emitter parameters that can be controlled with MIDI CC messages
+#[derive(Clone, Display, VariantArray, PartialEq)]
 pub enum ControlParam {
     Position,
     NumSlices,
@@ -145,7 +150,7 @@ pub enum ControlParam {
     Amplitude,
 }
 
-type MidiControlMap = HashMap<u7, ControlParam>;
+type MidiControlMap = Vec<(u7, ControlParam)>;
 
 pub enum EmitterMessage {
     Settings(EmitterSettings),

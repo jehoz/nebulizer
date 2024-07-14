@@ -6,13 +6,14 @@ use std::{
     time::Duration,
 };
 
-use eframe::egui::{self, vec2, Color32, DragValue, Frame, Stroke, Ui};
-use midly::num::u4;
+use eframe::egui::{self, vec2, Color32, ComboBox, DragValue, Frame, Stroke, Ui};
+use midly::num::{u4, u7};
 use rodio::{OutputStream, OutputStreamHandle, Source};
+use strum::VariantArray;
 
 use crate::{
     audio_clip::AudioClip,
-    emitter::{Emitter, EmitterMessage, EmitterSettings, KeyMode},
+    emitter::{ControlParam, Emitter, EmitterMessage, EmitterSettings, KeyMode},
     midi::MidiConfig,
     widgets::{
         envelope_plot::EnvelopePlot,
@@ -306,47 +307,92 @@ fn settings_panel(app: &mut NebulizerApp, ui: &mut Ui) {
     ui.label("MIDI Connection");
     match &app.midi_config.connection {
         Some((name, _conn)) => {
-            ui.label(format!("Connected to MIDI port: {}", name));
-            if ui.button("Disconnect").clicked() {
+            let mut disconnect_clicked = false;
+            ui.horizontal(|ui| {
+                ui.label(name);
+                disconnect_clicked = ui.button("Disconnect").clicked();
+            });
+            if disconnect_clicked {
                 app.midi_config.connection = None;
             }
         }
         None => {
-            if ui.button("Refresh").clicked() {
-                app.midi_config.refresh_ports();
-            }
-
-            ui.label("Click one to connect:");
-            for port in app.midi_config.ports.clone().iter() {
-                if ui
-                    .button(app.midi_config.midi_in.port_name(port).unwrap())
-                    .clicked()
-                {
-                    let handle = app.emitter.clone();
-                    let app_channel = app.midi_channel.clone();
-                    app.midi_config.connect(port, move |channel, message| {
-                        if channel == *app_channel.lock().unwrap() {
-                            if let Some(sender) = &handle.lock().unwrap().msg_sender {
-                                let _ = sender.send(EmitterMessage::Midi(message)).unwrap();
-                            }
-                        }
-                    });
+            ui.horizontal(|ui| {
+                if ui.button("Refresh").clicked() {
+                    app.midi_config.refresh_ports();
                 }
+            });
+
+            for port in app.midi_config.ports.clone().iter() {
+                ui.horizontal(|ui| {
+                    ui.label(app.midi_config.midi_in.port_name(port).unwrap());
+                    if ui.button("Connect").clicked() {
+                        let handle = app.emitter.clone();
+                        let app_channel = app.midi_channel.clone();
+                        app.midi_config.connect(port, move |channel, message| {
+                            if channel == *app_channel.lock().unwrap() {
+                                if let Some(sender) = &handle.lock().unwrap().msg_sender {
+                                    let _ = sender.send(EmitterMessage::Midi(message)).unwrap();
+                                }
+                            }
+                        });
+                    }
+                });
             }
         }
     }
+
     ui.separator();
 
     ui.label("MIDI Channel");
     let mut channel = app.midi_channel.lock().unwrap();
-    let mut ui_channel: u4 = channel.clone();
-    egui::ComboBox::from_label("MIDI Channel")
+    let mut selected_channel: u4 = channel.clone();
+    ComboBox::from_label("")
         .selected_text(channel.to_string())
         .show_ui(ui, |ui| {
             for i in 0..=15 {
                 let chan = u4::from(i);
-                ui.selectable_value(&mut ui_channel, chan, chan.to_string());
+                ui.selectable_value(&mut selected_channel, chan, chan.to_string());
             }
         });
-    *channel = ui_channel;
+    *channel = selected_channel;
+
+    ui.separator();
+    ui.label("MIDI CC");
+    let mut handle = app.emitter.lock().unwrap();
+    let mut to_delete = None;
+    for (e, (cc, param)) in handle.settings.midi_cc_map.iter_mut().enumerate() {
+        ui.horizontal(|ui| {
+            ComboBox::from_id_source(format!("cc-{e}"))
+                .selected_text(format!("CC {}", cc))
+                .show_ui(ui, |ui| {
+                    for i in 0u8..=127 {
+                        ui.selectable_value(cc, u7::from(i), format!("CC {}", i));
+                    }
+                });
+
+            ComboBox::from_id_source(format!("param-{e}"))
+                .selected_text(param.to_string())
+                .show_ui(ui, |ui| {
+                    for p in ControlParam::VARIANTS {
+                        ui.selectable_value(param, p.clone(), p.to_string());
+                    }
+                });
+
+            if ui.button("X").clicked() {
+                to_delete = Some(e);
+            }
+        });
+    }
+
+    if let Some(idx) = to_delete {
+        let _ = handle.settings.midi_cc_map.remove(idx);
+    }
+
+    if ui.button("+").clicked() {
+        handle
+            .settings
+            .midi_cc_map
+            .push((0.into(), ControlParam::Position));
+    }
 }
