@@ -176,23 +176,24 @@ impl<I> Emitter<I>
 where
     I: Sample,
 {
-    pub fn new(audio_clip: AudioClip<I>, channel: Receiver<EmitterMessage>) -> Emitter<I>
+    pub fn new(audio_clip: &AudioClip<I>, msg_receiver: Receiver<EmitterMessage>) -> Emitter<I>
     where
         I: Sample,
     {
         Emitter {
-            audio_clip,
+            audio_clip: audio_clip.clone(),
             current_audio_channel: 0,
             settings: EmitterSettings::default(),
-            msg_receiver: channel,
+            msg_receiver,
 
             notes: VecDeque::new(),
             grains: Vec::new(),
+
             terminated: false,
         }
     }
 
-    fn make_grain(&self, note: &Note) -> PitchedGrain<I> {
+    fn make_grain(&self, audio_clip: &AudioClip<I>, note: &Note) -> PitchedGrain<I> {
         let mut rng = thread_rng();
 
         let start = {
@@ -208,7 +209,7 @@ where
             if self.settings.spray > Duration::ZERO {
                 let spray_relative = {
                     let spray = self.settings.spray.as_secs_f32();
-                    let clip = self.audio_clip.total_duration().as_secs_f32();
+                    let clip = audio_clip.total_duration().as_secs_f32();
                     spray / clip
                 };
                 let min = (pos - spray_relative / 2.0).max(0.0);
@@ -228,15 +229,15 @@ where
 
         UniformSourceIterator::new(
             Grain::new(
-                self.audio_clip.clone(),
+                audio_clip.clone(),
                 start,
                 self.settings.length,
                 self.settings.grain_envelope.clone(),
             )
             .amplify(note.amplitude())
             .speed(speed),
-            self.audio_clip.channels,
-            self.audio_clip.sample_rate,
+            2,
+            audio_clip.sample_rate,
         )
     }
 
@@ -264,7 +265,9 @@ where
                 }
                 _ => {}
             },
-            EmitterMessage::Terminate => self.terminated = true,
+            EmitterMessage::Terminate => {
+                self.terminated = true;
+            }
         }
     }
 }
@@ -287,7 +290,7 @@ where
         }
 
         // only update notes (and potentially create new grains) at the beginning of an interleaved
-        // sequence.  this prevents grains from being created with their channels "out of sync"
+        // sequence.  this prevents grains from being created with their channels out of sync
         if self.current_audio_channel == 0 {
             let notes = mem::take(&mut self.notes);
             let mut live_notes = vec![];
@@ -303,7 +306,7 @@ where
                 }
 
                 if note.since_last_grain >= self.grain_interval() {
-                    let g = self.make_grain(&note);
+                    let g = self.make_grain(&self.audio_clip, &note);
                     self.grains.push(g);
                     note.since_last_grain = Duration::ZERO;
                 }
@@ -345,7 +348,8 @@ where
     }
 
     fn channels(&self) -> u16 {
-        self.audio_clip.channels
+        // hard code this for now, but it should probably be configurable
+        2
     }
 
     fn sample_rate(&self) -> u32 {

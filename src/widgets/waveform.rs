@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use eframe::{
-    egui::{pos2, vec2, Frame, Rect, Rounding, Stroke, Ui, Widget},
+    egui::{pos2, vec2, Frame, Rect, Rounding, Stroke, Ui, Vec2, Widget},
     emath, epaint,
 };
 use rodio::cpal::FromSample;
@@ -52,6 +52,7 @@ pub struct Waveform {
     data: WaveformData,
     playheads: Vec<f32>,
     grain_length: Duration,
+    desired_size: Option<Vec2>,
 }
 
 impl Waveform {
@@ -60,6 +61,7 @@ impl Waveform {
             data,
             playheads: Vec::new(),
             grain_length: Duration::ZERO,
+            desired_size: None,
         }
     }
 
@@ -70,6 +72,11 @@ impl Waveform {
 
     pub fn grain_length(mut self, grain_length: Duration) -> Self {
         self.grain_length = grain_length;
+        self
+    }
+
+    pub fn desired_size(mut self, desired_size: Vec2) -> Self {
+        self.desired_size = Some(desired_size);
         self
     }
 }
@@ -83,7 +90,13 @@ impl Widget for Waveform {
                 let waveform_color = ui.visuals().text_color();
                 let playhead_color = ui.visuals().selection.bg_fill;
 
-                let desired_size = ui.available_width() * vec2(1.0, 0.35);
+                let desired_size = {
+                    if let Some(size) = self.desired_size {
+                        size
+                    } else {
+                        ui.available_width() * vec2(1.0, 0.5)
+                    }
+                };
                 let (_id, rect) = ui.allocate_space(desired_size);
 
                 let bar_width = rect.width() / WAVEFORM_RESOLUTION as f32;
