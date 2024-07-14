@@ -71,7 +71,7 @@ impl NebulizerApp {
 
 enum GuiPanel {
     Emitters,
-    MidiSetup,
+    Settings,
 }
 
 impl eframe::App for NebulizerApp {
@@ -84,15 +84,15 @@ impl eframe::App for NebulizerApp {
                     self.active_panel = GuiPanel::Emitters;
                 }
 
-                if ui.button("Midi Setup").clicked() {
-                    self.active_panel = GuiPanel::MidiSetup;
+                if ui.button("Settings").clicked() {
+                    self.active_panel = GuiPanel::Settings;
                 }
             });
         });
 
         egui::CentralPanel::default().show(ctx, |ui| match self.active_panel {
             GuiPanel::Emitters => emitters_panel(self, ui),
-            GuiPanel::MidiSetup => midi_setup_panel(self, ui),
+            GuiPanel::Settings => settings_panel(self, ui),
         });
     }
 }
@@ -302,7 +302,8 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
     }
 }
 
-fn midi_setup_panel(app: &mut NebulizerApp, ui: &mut Ui) {
+fn settings_panel(app: &mut NebulizerApp, ui: &mut Ui) {
+    ui.label("MIDI Connection");
     match &app.midi_config.connection {
         Some((name, _conn)) => {
             ui.label(format!("Connected to MIDI port: {}", name));
@@ -334,4 +335,18 @@ fn midi_setup_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             }
         }
     }
+    ui.separator();
+
+    ui.label("MIDI Channel");
+    let mut channel = app.midi_channel.lock().unwrap();
+    let mut ui_channel: u4 = channel.clone();
+    egui::ComboBox::from_label("MIDI Channel")
+        .selected_text(channel.to_string())
+        .show_ui(ui, |ui| {
+            for i in 0..=15 {
+                let chan = u4::from(i);
+                ui.selectable_value(&mut ui_channel, chan, chan.to_string());
+            }
+        });
+    *channel = ui_channel;
 }
