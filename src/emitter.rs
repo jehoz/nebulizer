@@ -78,7 +78,7 @@ where
     audio_clip: AudioClip<I>,
     current_audio_channel: u16,
 
-    pub settings: EmitterParams,
+    pub params: EmitterParams,
 
     msg_receiver: Receiver<EmitterMessage>,
 
@@ -99,7 +99,7 @@ where
         Emitter {
             audio_clip: audio_clip.clone(),
             current_audio_channel: 0,
-            settings: EmitterParams::default(),
+            params: EmitterParams::default(),
             msg_receiver,
 
             notes: VecDeque::new(),
@@ -113,18 +113,18 @@ where
         let mut rng = thread_rng();
 
         let start = {
-            let pos = match self.settings.key_mode {
-                KeyMode::Pitch => self.settings.position,
+            let pos = match self.params.key_mode {
+                KeyMode::Pitch => self.params.position.value,
 
                 KeyMode::Slice => {
-                    let slice = note.key.as_int() % self.settings.num_slices;
-                    slice as f32 / self.settings.num_slices as f32
+                    let slice = note.key.as_int() % self.params.num_slices.value;
+                    slice as f32 / self.params.num_slices.value as f32
                 }
             };
 
-            if self.settings.spray > Duration::ZERO {
+            if self.params.spray.value > Duration::ZERO {
                 let spray_relative = {
-                    let spray = self.settings.spray.as_secs_f32();
+                    let spray = self.params.spray.value.as_secs_f32();
                     let clip = audio_clip.total_duration().as_secs_f32();
                     spray / clip
                 };
@@ -136,19 +136,19 @@ where
             }
         };
 
-        let speed = match self.settings.key_mode {
+        let speed = match self.params.key_mode {
             KeyMode::Pitch => {
-                interval_to_ratio((note.key.as_int() as i32 + self.settings.transpose) - 60)
+                interval_to_ratio((note.key.as_int() as i32 + self.params.transpose.value) - 60)
             }
-            KeyMode::Slice => interval_to_ratio(self.settings.transpose),
+            KeyMode::Slice => interval_to_ratio(self.params.transpose.value),
         };
 
         UniformSourceIterator::new(
             Grain::new(
                 audio_clip.clone(),
                 start,
-                self.settings.length,
-                self.settings.grain_envelope.clone(),
+                self.params.length.value,
+                self.params.grain_envelope.clone(),
             )
             .amplify(note.amplitude())
             .speed(speed),
@@ -158,19 +158,19 @@ where
     }
 
     fn grain_interval(&self) -> Duration {
-        Duration::from_secs_f32(1.0 / self.settings.density)
+        Duration::from_secs_f32(1.0 / self.params.density.value)
     }
 
     fn handle_message(&mut self, msg: EmitterMessage) {
         match msg {
-            EmitterMessage::Params(settings) => self.settings = settings,
+            EmitterMessage::Params(settings) => self.params = settings,
             EmitterMessage::Midi(midi_msg) => match midi_msg {
                 MidiMessage::NoteOn { key, .. } => {
-                    while self.settings.polyphony < self.notes.len() as u32 + 1 {
+                    while self.params.polyphony < self.notes.len() as u32 + 1 {
                         self.notes.pop_front();
                     }
                     self.notes
-                        .push_back(Note::new(key, self.settings.note_envelope.clone()));
+                        .push_back(Note::new(key, self.params.note_envelope.clone()));
                 }
                 MidiMessage::NoteOff { key, .. } => {
                     for note in self.notes.iter_mut() {
@@ -246,7 +246,7 @@ where
 
         if let Some(sample) = samples.into_iter().reduce(|a, b| a.saturating_add(b)) {
             // use tanh as a primitive limiter
-            let sample = f32::from_sample(sample.amplify(self.settings.amplitude)).tanh();
+            let sample = f32::from_sample(sample.amplify(self.params.amplitude.value)).tanh();
             Some(sample.to_sample())
         } else {
             Some(0.0)

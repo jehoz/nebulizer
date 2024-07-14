@@ -132,11 +132,12 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 
     let playheads = match handle.params.key_mode {
         KeyMode::Pitch => {
-            vec![handle.params.position]
+            vec![handle.params.position.value]
         }
-        KeyMode::Slice => (0..handle.params.num_slices)
-            .map(|i| i as f32 / handle.params.num_slices as f32)
-            .collect(),
+        KeyMode::Slice => {
+            let slices = handle.params.num_slices.value;
+            (0..slices).map(|i| i as f32 / slices as f32).collect()
+        }
     };
 
     let waveform_size = ui.available_width() * vec2(1.0, 0.25);
@@ -144,7 +145,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         ui.add(
             Waveform::new(waveform.clone())
                 .playheads(playheads)
-                .grain_length(handle.params.length)
+                .grain_length(handle.params.length.value)
                 .desired_size(waveform_size),
         );
     } else {
@@ -164,9 +165,10 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         ui.separator();
 
         ui.label("Transpose");
+        let transpose_param = &mut handle.params.transpose;
         ui.add(
-            DragValue::new(&mut handle.params.transpose)
-                .clamp_range(-12..=12)
+            DragValue::new(&mut transpose_param.value)
+                .clamp_range(transpose_param.range.clone())
                 .suffix(" st"),
         );
     });
@@ -182,35 +184,28 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         match handle.params.key_mode {
             KeyMode::Pitch => {
                 cols[1].add(
-                    ParameterKnob::new(&mut handle.params.position, 0.0..=1.0)
+                    ParameterKnob::from_param(&mut handle.params.position)
                         .max_decimals(2)
                         .label("Position"),
                 );
             }
             KeyMode::Slice => {
-                cols[1].add(
-                    ParameterKnob::new(&mut handle.params.num_slices, 1..=127).label("Slices"),
-                );
+                cols[1]
+                    .add(ParameterKnob::from_param(&mut handle.params.num_slices).label("Slices"));
             }
         }
         cols[2].add(
-            ParameterKnob::new(
-                &mut handle.params.spray,
-                Duration::ZERO..=Duration::from_secs(1),
-            )
-            .logarithmic(true)
-            .label("Spray"),
+            ParameterKnob::from_param(&mut handle.params.spray)
+                .logarithmic(true)
+                .label("Spray"),
         );
         cols[3].add(
-            ParameterKnob::new(
-                &mut handle.params.length,
-                Duration::ZERO..=Duration::from_secs(1),
-            )
-            .logarithmic(true)
-            .label("Length"),
+            ParameterKnob::from_param(&mut handle.params.length)
+                .logarithmic(true)
+                .label("Length"),
         );
         cols[4].add(
-            ParameterKnob::new(&mut handle.params.density, 1.0..=100.0)
+            ParameterKnob::from_param(&mut handle.params.density)
                 .logarithmic(true)
                 .max_decimals(2)
                 .label("Density")
@@ -218,7 +213,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         );
 
         cols[5].add(
-            ParameterKnob::new(&mut handle.params.amplitude, 0.0..=1.0)
+            ParameterKnob::from_param(&mut handle.params.amplitude)
                 .max_decimals(2)
                 .label("Level"),
         );

@@ -34,19 +34,19 @@ pub struct EmitterParams {
     pub key_mode: KeyMode,
 
     /// Number of equal-length slices of the clip are mapped to different keys in the Slice key mode
-    pub num_slices: u8,
+    pub num_slices: Parameter<u8>,
 
     /// The relative position in the source file where a grain starts (in pitch mode)
-    pub position: f32,
+    pub position: Parameter<f32>,
 
     /// Amount of random deviation from position parameter
-    pub spray: Duration,
+    pub spray: Parameter<Duration>,
 
     /// The length of a grain window
-    pub length: Duration,
+    pub length: Parameter<Duration>,
 
     /// The number of grains played per second (in hz)
-    pub density: f32,
+    pub density: Parameter<f32>,
 
     /// Envelope applied to each grain
     pub grain_envelope: GrainEnvelope,
@@ -58,10 +58,10 @@ pub struct EmitterParams {
     pub polyphony: u32,
 
     /// Pitch transposition of input sample in semitones
-    pub transpose: i32,
+    pub transpose: Parameter<i32>,
 
     /// The volume level of sound coming out of the emitter, relative to the original audio sample
-    pub amplitude: f32,
+    pub amplitude: Parameter<f32>,
 }
 
 impl Default for EmitterParams {
@@ -69,19 +69,22 @@ impl Default for EmitterParams {
         EmitterParams {
             midi_cc_map: Vec::new(),
             key_mode: KeyMode::Pitch,
-            num_slices: 12,
-            position: 0.0,
-            spray: Duration::ZERO,
-            length: Duration::from_millis(100),
-            density: 10.0,
+            num_slices: Parameter::new(12, 1..=127),
+            position: Parameter::new(0.0, 0.0..=1.0),
+            spray: Parameter::new(Duration::ZERO, Duration::ZERO..=Duration::from_secs(1)),
+            length: Parameter::new(
+                Duration::from_millis(100),
+                Duration::ZERO..=Duration::from_secs(1),
+            ),
+            density: Parameter::new(10.0, 1.0..=100.0),
             grain_envelope: GrainEnvelope {
                 amount: 0.5,
                 skew: 0.0,
             },
             note_envelope: AdsrEnvelope::default(),
             polyphony: 8,
-            transpose: 0,
-            amplitude: 1.0,
+            transpose: Parameter::new(0, -12..=12),
+            amplitude: Parameter::new(1.0, 0.0..=1.0),
         }
     }
 }
