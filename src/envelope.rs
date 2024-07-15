@@ -69,13 +69,22 @@ impl Default for AdsrEnvelope {
 
 #[derive(Clone)]
 pub struct GrainEnvelope {
-    pub amount: f32,
-    pub skew: f32,
+    pub amount: Parameter<f32>,
+    pub skew: Parameter<f32>,
 }
 
 impl GrainEnvelope {
     pub fn amplitude_at(&self, x: f32) -> f32 {
-        tukey_window(x, 1.0, self.amount, self.skew)
+        tukey_window(x, 1.0, self.amount.get(), self.skew.get())
+    }
+}
+
+impl Default for GrainEnvelope {
+    fn default() -> Self {
+        Self {
+            amount: Parameter::new(0.5, 0.0..=1.0),
+            skew: Parameter::new(0.0, -1.0..=1.0),
+        }
     }
 }
 
