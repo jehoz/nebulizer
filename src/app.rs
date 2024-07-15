@@ -145,6 +145,8 @@ impl eframe::App for NebulizerApp {
             GuiPanel::Emitters => emitters_panel(self, ui),
             GuiPanel::Settings => settings_panel(self, ui),
         });
+
+        ctx.request_repaint();
     }
 }
 
