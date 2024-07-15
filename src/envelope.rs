@@ -2,44 +2,50 @@ use std::{f32::consts::PI, time::Duration};
 
 use eframe::egui::lerp;
 
+use crate::params::Parameter;
+
 #[derive(Clone)]
 pub struct AdsrEnvelope {
-    pub attack: Duration,
-    pub decay: Duration,
-    pub sustain_level: f32,
-    pub release: Duration,
+    pub attack: Parameter<Duration>,
+    pub decay: Parameter<Duration>,
+    pub sustain_level: Parameter<f32>,
+    pub release: Parameter<Duration>,
 }
 
 impl AdsrEnvelope {
     pub fn held_amplitude(&self, held_for: Duration) -> f32 {
-        if held_for <= self.attack {
+        let attack = self.attack.get();
+        let decay = self.decay.get();
+        let sustain = self.sustain_level.get();
+
+        if held_for <= attack {
+            lerp(0.0..=1.0, held_for.as_secs_f32() / attack.as_secs_f32())
+        } else if held_for <= attack + decay {
             lerp(
-                0.0..=1.0,
-                held_for.as_secs_f32() / self.attack.as_secs_f32(),
-            )
-        } else if held_for <= self.attack + self.decay {
-            lerp(
-                1.0..=self.sustain_level,
-                (held_for - self.attack).as_secs_f32() / self.decay.as_secs_f32(),
+                1.0..=sustain,
+                (held_for - attack).as_secs_f32() / decay.as_secs_f32(),
             )
         } else {
-            self.sustain_level
+            sustain
         }
     }
 
     pub fn released_amplitude(&self, since_released: Duration) -> f32 {
-        if since_released > self.release {
+        let release = self.release.get();
+        let sustain = self.sustain_level.get();
+
+        if since_released > release {
             0.0
         } else {
             lerp(
-                self.sustain_level..=0.0,
-                since_released.as_secs_f32() / self.release.as_secs_f32(),
+                sustain..=0.0,
+                since_released.as_secs_f32() / release.as_secs_f32(),
             )
         }
     }
 
     pub fn oneshot_amplitude(&self, since_triggered: Duration) -> f32 {
-        let attack_decay = self.attack + self.decay;
+        let attack_decay = self.attack.get() + self.decay.get();
 
         if since_triggered <= attack_decay {
             self.held_amplitude(since_triggered)
@@ -51,11 +57,12 @@ impl AdsrEnvelope {
 
 impl Default for AdsrEnvelope {
     fn default() -> Self {
+        let time_range = Duration::ZERO..=Duration::from_secs(10);
         Self {
-            attack: Duration::ZERO,
-            decay: Duration::from_millis(1000),
-            sustain_level: 1.0,
-            release: Duration::from_millis(15),
+            attack: Parameter::new(Duration::ZERO, time_range.clone()).logarithmic(true),
+            decay: Parameter::new(Duration::from_secs(1), time_range.clone()).logarithmic(true),
+            sustain_level: Parameter::new(1.0, 0.0..=1.0),
+            release: Parameter::new(Duration::from_millis(15), time_range).logarithmic(true),
         }
     }
 }
