@@ -1,5 +1,6 @@
 use std::{ops::RangeInclusive, time::Duration};
 
+use eframe::egui::{lerp, remap_clamp};
 use midly::num::u7;
 use strum_macros::{Display, VariantArray};
 
@@ -10,26 +11,120 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Parameter<I> {
-    pub value: I,
-    pub range: RangeInclusive<I>,
+    value: I,
+    range: RangeInclusive<I>,
+    logarithmic: bool,
+    smallest_positive: f64,
 }
 
 impl<I> Parameter<I>
 where
     I: Numeric,
 {
-    fn new(default: I, range: RangeInclusive<I>) -> Self {
+    pub fn new(default: I, range: RangeInclusive<I>) -> Self {
         Self {
             value: default,
             range,
+            logarithmic: false,
+            smallest_positive: 1e-6,
         }
     }
 
-    pub fn set_from_midi_cc(&mut self, cc_value: u7) {
-        let normalized_value = cc_value.as_int() as f64 / 127.0;
-        let (min, max) = (self.range.start().to_f64(), self.range.end().to_f64());
-        let value_in_range = normalized_value * (max - min) + min;
-        self.value = I::from_f64(value_in_range);
+    pub fn logarithmic(mut self, logarithmic: bool) -> Self {
+        self.logarithmic = logarithmic;
+        self
+    }
+
+    pub fn smallest_positive(mut self, smallest_positive: f64) -> Self {
+        self.smallest_positive = smallest_positive;
+        self
+    }
+
+    pub fn get(&self) -> I {
+        self.value
+    }
+
+    pub fn set(&mut self, val: I) {
+        self.value = val;
+    }
+
+    pub fn range(&self) -> RangeInclusive<I> {
+        self.range.clone()
+    }
+
+    /// Get current value as a normalized position [0,1] in range
+    pub fn get_normalized(&self) -> f64 {
+        self.value_to_normalized(self.value.to_f64(), self.range_f64())
+    }
+
+    /// Set value using a normalized position [0,1] within range
+    pub fn set_normalized(&mut self, norm_val: f64) {
+        let val = self.normalized_to_value(norm_val, self.range_f64());
+        self.value = I::from_f64(val);
+    }
+
+    fn range_f64(&self) -> RangeInclusive<f64> {
+        self.range.start().to_f64()..=self.range.end().to_f64()
+    }
+
+    fn value_to_normalized(&self, value: f64, range: RangeInclusive<f64>) -> f64 {
+        let (min, max) = (*range.start(), *range.end());
+
+        if min == max {
+            0.5
+        } else if min > max {
+            1.0 - self.value_to_normalized(value, max..=min)
+        } else if value <= min {
+            0.0
+        } else if value >= max {
+            1.0
+        } else if self.logarithmic {
+            assert!(
+                min >= 0.0 && max > min,
+                "Logarithmic scale only implemented for positive ranges right now"
+            );
+
+            let min_log = if min <= self.smallest_positive {
+                self.smallest_positive.log10()
+            } else {
+                min.log10()
+            };
+            let max_log = max.log10();
+
+            remap_clamp(value.log10(), min_log..=max_log, 0.0..=1.0)
+        } else {
+            remap_clamp(value, range, 0.0..=1.0)
+        }
+    }
+
+    fn normalized_to_value(&self, normalized: f64, range: RangeInclusive<f64>) -> f64 {
+        let (min, max) = (*range.start(), *range.end());
+
+        if min == max {
+            min
+        } else if min > max {
+            self.normalized_to_value(1.0 - normalized, max..=min)
+        } else if normalized <= 0.0 {
+            min
+        } else if normalized >= 1.0 {
+            max
+        } else if self.logarithmic {
+            assert!(
+                min >= 0.0 && max > min,
+                "Logarithmic scale only implemented for positive ranges right now"
+            );
+            let min_log = if min <= self.smallest_positive {
+                self.smallest_positive.log10()
+            } else {
+                min.log10()
+            };
+            let max_log = max.log10();
+
+            let log = lerp(min_log..=max_log, normalized);
+            10.0_f64.powf(log)
+        } else {
+            lerp(range, normalized.clamp(0.0, 1.0))
+        }
     }
 }
 
@@ -84,12 +179,14 @@ impl Default for EmitterParams {
             key_mode: KeyMode::Pitch,
             num_slices: Parameter::new(12, 1..=127),
             position: Parameter::new(0.0, 0.0..=1.0),
-            spray: Parameter::new(Duration::ZERO, Duration::ZERO..=Duration::from_secs(1)),
+            spray: Parameter::new(Duration::ZERO, Duration::ZERO..=Duration::from_secs(1))
+                .logarithmic(true),
             length: Parameter::new(
                 Duration::from_millis(100),
                 Duration::ZERO..=Duration::from_secs(1),
-            ),
-            density: Parameter::new(10.0, 1.0..=100.0),
+            )
+            .logarithmic(true),
+            density: Parameter::new(10.0, 1.0..=100.0).logarithmic(true),
             grain_envelope: GrainEnvelope {
                 amount: 0.5,
                 skew: 0.0,
