@@ -6,7 +6,10 @@ use std::{
     time::Duration,
 };
 
-use eframe::egui::{self, vec2, Color32, ComboBox, DragValue, Frame, Stroke, Ui};
+use eframe::{
+    egui::{self, vec2, Color32, ComboBox, DragValue, Frame, Stroke, Ui},
+    emath::Numeric,
+};
 use midly::{
     num::{u4, u7},
     MidiMessage,
@@ -220,10 +223,16 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 
         ui.label("Transpose");
         let transpose_param = &mut handle.params.transpose;
+        let transpose_range = transpose_param.range();
         ui.add(
-            DragValue::new(&mut transpose_param.get())
-                .clamp_range(transpose_param.range())
-                .suffix(" st"),
+            DragValue::from_get_set(|new_val| {
+                if let Some(v) = new_val {
+                    transpose_param.set(i32::from_f64(v));
+                }
+                transpose_param.get().to_f64()
+            })
+            .clamp_range(transpose_range)
+            .suffix(" st"),
         );
     });
 
