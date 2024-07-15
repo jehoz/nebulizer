@@ -1,7 +1,4 @@
-use std::{
-    f32::consts::{PI, TAU},
-    ops::RangeInclusive,
-};
+use std::f32::consts::{PI, TAU};
 
 use eframe::egui::{
     lerp, remap_clamp, Color32, DragValue, Pos2, Response, Sense, Shape, Stroke, Ui, Vec2, Widget,
@@ -12,24 +9,11 @@ use crate::{numeric::Numeric, params::Parameter};
 
 const ARC_RESOLUTION: usize = 32;
 
-/// Copied from egui slider source
-type GetSetValue<'a> = Box<dyn 'a + FnMut(Option<f64>) -> f64>;
+pub struct ParameterKnob<'a, I> {
+    param: &'a mut Parameter<I>,
 
-fn get(get_set_value: &mut GetSetValue<'_>) -> f64 {
-    (get_set_value)(None)
-}
-
-fn set(get_set_value: &mut GetSetValue<'_>, value: f64) {
-    (get_set_value)(Some(value));
-}
-
-pub struct ParameterKnob<'a> {
-    get_set_value: GetSetValue<'a>,
-    range: RangeInclusive<f64>,
     diameter: f32,
     drag_speed: f64,
-    logarithmic: bool,
-    smallest_positive: f64,
     min_decimals: usize,
     max_decimals: Option<usize>,
     label: Option<WidgetText>,
@@ -39,63 +23,32 @@ pub struct ParameterKnob<'a> {
     is_duration: bool,
 }
 
-impl<'a> ParameterKnob<'a> {
-    pub fn new<Num: Numeric>(value: &'a mut Num, range: RangeInclusive<Num>) -> Self {
-        let range_f64 = range.start().to_f64()..=range.end().to_f64();
-        let mut knob = Self::from_get_set(range_f64, move |v: Option<f64>| {
-            if let Some(v) = v {
-                *value = Num::from_f64(v);
-            }
-            value.to_f64()
-        });
-
-        if Num::INTEGRAL {
-            knob.smallest_positive = 1.0;
-            knob.max_decimals = Some(0);
-        }
-
-        if Num::DURATION {
-            knob.is_duration = true;
-            knob.smallest_positive = 0.001;
-        }
-
-        knob
-    }
-
-    pub fn from_get_set(
-        range: RangeInclusive<f64>,
-        get_set_value: impl 'a + FnMut(Option<f64>) -> f64,
-    ) -> Self {
-        Self {
-            get_set_value: Box::new(get_set_value),
-            range,
+impl<'a, I> ParameterKnob<'a, I>
+where
+    I: Numeric,
+{
+    pub fn from_param(param: &'a mut Parameter<I>) -> Self {
+        let mut knob = Self {
+            param,
             diameter: 24.0,
             drag_speed: 0.002,
-            logarithmic: false,
-            smallest_positive: 1e-6,
             min_decimals: 0,
             max_decimals: None,
             label: None,
             suffix: None,
             fill: None,
             is_duration: false,
+        };
+
+        if I::INTEGRAL {
+            knob.max_decimals = Some(0);
         }
-    }
 
-    pub fn from_param<Num: Numeric>(param: &'a mut Parameter<Num>) -> Self {
-        Self::new(&mut param.value, param.range.clone())
-    }
+        if I::DURATION {
+            knob.is_duration = true;
+        }
 
-    #[inline]
-    pub fn logarithmic(mut self, logarithmic: bool) -> Self {
-        self.logarithmic = logarithmic;
-        self
-    }
-
-    #[inline]
-    pub fn smallest_positive(mut self, smallest_positive: f64) -> Self {
-        self.smallest_positive = smallest_positive;
-        self
+        knob
     }
 
     #[inline]
@@ -129,7 +82,10 @@ impl<'a> ParameterKnob<'a> {
     }
 }
 
-impl<'a> ParameterKnob<'a> {
+impl<'a, I> ParameterKnob<'a, I>
+where
+    I: Numeric,
+{
     fn allocate_knob_space(&self, ui: &mut Ui) -> Response {
         let desired_size = Vec2::splat(self.diameter);
         ui.allocate_response(desired_size, Sense::click_and_drag())
@@ -141,10 +97,9 @@ impl<'a> ParameterKnob<'a> {
             let drag_delta = response.drag_delta();
             let delta = (self.drag_speed) * (drag_delta.x + drag_delta.y * -1.0) as f64;
 
-            let val = get(&mut self.get_set_value);
-            let new_pos = self.value_to_position(val, self.range.clone());
-            let new_val = self.position_to_value(new_pos + delta, self.range.clone());
-            set(&mut self.get_set_value, new_val);
+            let norm_val = self.param.get_normalized();
+            self.param
+                .set_normalized((norm_val + delta).clamp(0.0, 1.0));
             response.mark_changed();
         }
 
@@ -168,8 +123,7 @@ impl<'a> ParameterKnob<'a> {
                 max_angle,
             );
 
-            let value = get(&mut self.get_set_value);
-            let normalized = self.value_to_position(value, self.range.clone());
+            let normalized = self.param.get_normalized();
             let angle_range = min_angle..=max_angle;
             let value_angle = remap_clamp(normalized as f32, 0.0..=1.0, angle_range.clone());
             draw_arc(
@@ -191,71 +145,12 @@ impl<'a> ParameterKnob<'a> {
             ui.painter().add(tick);
         }
     }
-
-    /// computes the normalized knob position [0.0, 1.0] from value in range
-    fn value_to_position(&self, value: f64, range: RangeInclusive<f64>) -> f64 {
-        let (min, max) = (*range.start(), *range.end());
-
-        if min == max {
-            0.5
-        } else if min > max {
-            1.0 - self.value_to_position(value, max..=min)
-        } else if value <= min {
-            0.0
-        } else if value >= max {
-            1.0
-        } else if self.logarithmic {
-            assert!(
-                min >= 0.0 && max > min,
-                "Logarithmic scale only implemented for positive ranges right now"
-            );
-
-            let min_log = if min <= self.smallest_positive {
-                self.smallest_positive.log10()
-            } else {
-                min.log10()
-            };
-            let max_log = max.log10();
-
-            remap_clamp(value.log10(), min_log..=max_log, 0.0..=1.0)
-        } else {
-            remap_clamp(value, range, 0.0..=1.0)
-        }
-    }
-
-    /// computes the appropriate value in range from the normalized knob position
-    fn position_to_value(&self, position: f64, range: RangeInclusive<f64>) -> f64 {
-        let (min, max) = (*range.start(), *range.end());
-
-        if min == max {
-            min
-        } else if min > max {
-            self.position_to_value(1.0 - position, max..=min)
-        } else if position <= 0.0 {
-            min
-        } else if position >= 1.0 {
-            max
-        } else if self.logarithmic {
-            assert!(
-                min >= 0.0 && max > min,
-                "Logarithmic scale only implemented for positive ranges right now"
-            );
-            let min_log = if min <= self.smallest_positive {
-                self.smallest_positive.log10()
-            } else {
-                min.log10()
-            };
-            let max_log = max.log10();
-
-            let log = lerp(min_log..=max_log, position);
-            10.0_f64.powf(log)
-        } else {
-            lerp(range, position.clamp(0.0, 1.0))
-        }
-    }
 }
 
-impl<'a> Widget for ParameterKnob<'a> {
+impl<'a, I> Widget for ParameterKnob<'a, I>
+where
+    I: Numeric,
+{
     fn ui(mut self, ui: &mut eframe::egui::Ui) -> eframe::egui::Response {
         ui.vertical_centered(move |ui| {
             if let Some(label) = &self.label {
@@ -265,11 +160,22 @@ impl<'a> Widget for ParameterKnob<'a> {
             let mut response = self.allocate_knob_space(ui);
             self.knob_ui(ui, &mut response);
 
-            let mut drag_val = DragValue::from_get_set(self.get_set_value)
-                .clamp_range(self.range.clone())
-                .min_decimals(self.min_decimals)
-                .max_decimals_opt(self.max_decimals)
-                .speed(self.drag_speed * (self.range.end() - self.range.start()));
+            let range = self.param.range();
+            let range_f64 = range.start().to_f64()..=range.end().to_f64();
+            // there's probably a less hacky way to make this work but this is fine for now
+            let mut value = self.param.get();
+            let mut drag_val = DragValue::from_get_set(|new_val: Option<f64>| {
+                let val_ref = &mut value;
+                if let Some(v) = new_val {
+                    *val_ref = I::from_f64(v);
+                }
+                val_ref.to_f64()
+            })
+            .clamp_range(range_f64.clone())
+            .min_decimals(self.min_decimals)
+            .max_decimals_opt(self.max_decimals)
+            .speed(self.drag_speed * (range_f64.end() - range_f64.start()));
+
             if self.is_duration {
                 drag_val = drag_val
                     .custom_formatter(|n, _| {
@@ -294,7 +200,11 @@ impl<'a> Widget for ParameterKnob<'a> {
             if let Some(suffix) = &self.suffix {
                 drag_val = drag_val.suffix(suffix);
             }
-            ui.add(drag_val);
+
+            let drag_r = ui.add(drag_val);
+            if drag_r.changed() {
+                self.param.set(value);
+            }
         })
         .response
     }

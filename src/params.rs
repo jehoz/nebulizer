@@ -22,12 +22,22 @@ where
     I: Numeric,
 {
     pub fn new(default: I, range: RangeInclusive<I>) -> Self {
-        Self {
+        let mut p = Self {
             value: default,
             range,
             logarithmic: false,
             smallest_positive: 1e-6,
+        };
+
+        if I::INTEGRAL {
+            p.smallest_positive = 1.0;
         }
+
+        if I::DURATION {
+            p.smallest_positive = 0.001;
+        }
+
+        p
     }
 
     pub fn logarithmic(mut self, logarithmic: bool) -> Self {
@@ -187,10 +197,7 @@ impl Default for EmitterParams {
             )
             .logarithmic(true),
             density: Parameter::new(10.0, 1.0..=100.0).logarithmic(true),
-            grain_envelope: GrainEnvelope {
-                amount: 0.5,
-                skew: 0.0,
-            },
+            grain_envelope: GrainEnvelope::default(),
             note_envelope: AdsrEnvelope::default(),
             polyphony: 8,
             transpose: Parameter::new(0, -12..=12),

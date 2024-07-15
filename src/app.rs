@@ -86,18 +86,21 @@ fn handle_midi_msg(emitter: Arc<Mutex<EmitterHandle>>, message: MidiMessage) {
             }
             MidiMessage::Controller { controller, value } => {
                 let cc_map = handle.params.midi_cc_map.clone();
+                let norm_value = value.as_int() as f64 / 127.0;
                 for (cc, param) in cc_map.iter() {
                     if *cc == controller {
                         match param {
                             ControlParam::Position => {
-                                handle.params.position.set_from_midi_cc(value)
+                                handle.params.position.set_normalized(norm_value)
                             }
                             ControlParam::NumSlices => {
-                                handle.params.num_slices.set_from_midi_cc(value)
+                                handle.params.num_slices.set_normalized(norm_value)
                             }
-                            ControlParam::Spray => handle.params.spray.set_from_midi_cc(value),
-                            ControlParam::Length => handle.params.length.set_from_midi_cc(value),
-                            ControlParam::Density => handle.params.density.set_from_midi_cc(value),
+                            ControlParam::Spray => handle.params.spray.set_normalized(norm_value),
+                            ControlParam::Length => handle.params.length.set_normalized(norm_value),
+                            ControlParam::Density => {
+                                handle.params.density.set_normalized(norm_value)
+                            }
                             ControlParam::GrainEnvelopeAmount => todo!(),
                             ControlParam::GrainEnvelopeSkew => todo!(),
                             ControlParam::NoteEnvelopeAttack => todo!(),
@@ -105,10 +108,10 @@ fn handle_midi_msg(emitter: Arc<Mutex<EmitterHandle>>, message: MidiMessage) {
                             ControlParam::NoteEnvelopeSustain => todo!(),
                             ControlParam::NoteEnvelopeRelease => todo!(),
                             ControlParam::Transpose => {
-                                handle.params.transpose.set_from_midi_cc(value)
+                                handle.params.transpose.set_normalized(norm_value)
                             }
                             ControlParam::Amplitude => {
-                                handle.params.amplitude.set_from_midi_cc(value)
+                                handle.params.amplitude.set_normalized(norm_value)
                             }
                         }
                     }
@@ -183,10 +186,10 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 
     let playheads = match handle.params.key_mode {
         KeyMode::Pitch => {
-            vec![handle.params.position.value]
+            vec![handle.params.position.get()]
         }
         KeyMode::Slice => {
-            let slices = handle.params.num_slices.value;
+            let slices = handle.params.num_slices.get();
             (0..slices).map(|i| i as f32 / slices as f32).collect()
         }
     };
@@ -196,7 +199,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         ui.add(
             Waveform::new(waveform.clone())
                 .playheads(playheads)
-                .grain_length(handle.params.length.value)
+                .grain_length(handle.params.length.get())
                 .desired_size(waveform_size),
         );
     } else {
@@ -218,8 +221,8 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         ui.label("Transpose");
         let transpose_param = &mut handle.params.transpose;
         ui.add(
-            DragValue::new(&mut transpose_param.value)
-                .clamp_range(transpose_param.range.clone())
+            DragValue::new(&mut transpose_param.get())
+                .clamp_range(transpose_param.range())
                 .suffix(" st"),
         );
     });
@@ -245,19 +248,10 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     .add(ParameterKnob::from_param(&mut handle.params.num_slices).label("Slices"));
             }
         }
-        cols[2].add(
-            ParameterKnob::from_param(&mut handle.params.spray)
-                .logarithmic(true)
-                .label("Spray"),
-        );
-        cols[3].add(
-            ParameterKnob::from_param(&mut handle.params.length)
-                .logarithmic(true)
-                .label("Length"),
-        );
+        cols[2].add(ParameterKnob::from_param(&mut handle.params.spray).label("Spray"));
+        cols[3].add(ParameterKnob::from_param(&mut handle.params.length).label("Length"));
         cols[4].add(
             ParameterKnob::from_param(&mut handle.params.density)
-                .logarithmic(true)
                 .max_decimals(2)
                 .label("Density")
                 .suffix(" Hz"),
@@ -290,33 +284,21 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             );
             ui.columns(4, |cols| {
                 cols[0].add(
-                    ParameterKnob::new(
-                        &mut handle.params.note_envelope.attack,
-                        Duration::ZERO..=Duration::from_secs(10),
-                    )
-                    .logarithmic(true)
-                    .label("Attack"),
+                    ParameterKnob::from_param(&mut handle.params.note_envelope.attack)
+                        .label("Attack"),
                 );
                 cols[1].add(
-                    ParameterKnob::new(
-                        &mut handle.params.note_envelope.decay,
-                        Duration::ZERO..=Duration::from_secs(10),
-                    )
-                    .logarithmic(true)
-                    .label("Decay"),
+                    ParameterKnob::from_param(&mut handle.params.note_envelope.decay)
+                        .label("Decay"),
                 );
                 cols[2].add(
-                    ParameterKnob::new(&mut handle.params.note_envelope.sustain_level, 0.0..=1.0)
+                    ParameterKnob::from_param(&mut handle.params.note_envelope.sustain_level)
                         .max_decimals(2)
                         .label("Sustain"),
                 );
                 cols[3].add(
-                    ParameterKnob::new(
-                        &mut handle.params.note_envelope.release,
-                        Duration::ZERO..=Duration::from_secs(10),
-                    )
-                    .logarithmic(true)
-                    .label("Release"),
+                    ParameterKnob::from_param(&mut handle.params.note_envelope.release)
+                        .label("Release"),
                 );
             });
         });
@@ -331,13 +313,13 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             );
             ui.columns(2, |cols| {
                 cols[0].add(
-                    ParameterKnob::new(&mut handle.params.grain_envelope.amount, 0.0..=1.0)
+                    ParameterKnob::from_param(&mut handle.params.grain_envelope.amount)
                         .max_decimals(2)
                         .label("Amount"),
                 );
 
                 cols[1].add(
-                    ParameterKnob::new(&mut handle.params.grain_envelope.skew, -1.0..=1.0)
+                    ParameterKnob::from_param(&mut handle.params.grain_envelope.skew)
                         .max_decimals(2)
                         .label("Skew"),
                 );
