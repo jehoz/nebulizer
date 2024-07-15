@@ -1,4 +1,4 @@
-use midly::{num::u7, MidiMessage};
+use midly::num::u7;
 use rand::{thread_rng, Rng};
 use rodio::cpal::{FromSample, Sample as CpalSample};
 use rodio::source::Amplify;
@@ -44,7 +44,7 @@ impl Note {
             NoteState::Held(time) => self.state = NoteState::Held(time + delta_time),
             NoteState::Released(time) => {
                 let new_time = time + delta_time;
-                if new_time >= self.envelope.release {
+                if new_time >= self.envelope.release.get() {
                     self.state = NoteState::Finished;
                 } else {
                     self.state = NoteState::Released(new_time);
@@ -115,17 +115,18 @@ where
 
         let start = {
             let pos = match self.params.key_mode {
-                KeyMode::Pitch => self.params.position.value,
+                KeyMode::Pitch => self.params.position.get(),
 
                 KeyMode::Slice => {
-                    let slice = note.key.as_int() % self.params.num_slices.value;
-                    slice as f32 / self.params.num_slices.value as f32
+                    let num_slices = self.params.num_slices.get();
+                    let slice = note.key.as_int() % num_slices;
+                    slice as f32 / num_slices as f32
                 }
             };
 
-            if self.params.spray.value > Duration::ZERO {
+            if self.params.spray.get() > Duration::ZERO {
                 let spray_relative = {
-                    let spray = self.params.spray.value.as_secs_f32();
+                    let spray = self.params.spray.get().as_secs_f32();
                     let clip = audio_clip.total_duration().as_secs_f32();
                     spray / clip
                 };
@@ -139,16 +140,16 @@ where
 
         let speed = match self.params.key_mode {
             KeyMode::Pitch => {
-                interval_to_ratio((note.key.as_int() as i32 + self.params.transpose.value) - 60)
+                interval_to_ratio((note.key.as_int() as i32 + self.params.transpose.get()) - 60)
             }
-            KeyMode::Slice => interval_to_ratio(self.params.transpose.value),
+            KeyMode::Slice => interval_to_ratio(self.params.transpose.get()),
         };
 
         UniformSourceIterator::new(
             Grain::new(
                 audio_clip.clone(),
                 start,
-                self.params.length.value,
+                self.params.length.get(),
                 self.params.grain_envelope.clone(),
             )
             .amplify(note.amplitude())
@@ -159,7 +160,7 @@ where
     }
 
     fn grain_interval(&self) -> Duration {
-        Duration::from_secs_f32(1.0 / self.params.density.value)
+        Duration::from_secs_f32(1.0 / self.params.density.get())
     }
 
     fn handle_message(&mut self, msg: EmitterMessage) {
@@ -244,7 +245,7 @@ where
 
         if let Some(sample) = samples.into_iter().reduce(|a, b| a.saturating_add(b)) {
             // use tanh as a primitive limiter
-            let sample = f32::from_sample(sample.amplify(self.params.amplitude.value)).tanh();
+            let sample = f32::from_sample(sample.amplify(self.params.amplitude.get())).tanh();
             Some(sample.to_sample())
         } else {
             Some(0.0)
