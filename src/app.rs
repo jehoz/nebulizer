@@ -1,9 +1,6 @@
-use std::{
-    sync::{
-        mpsc::{self, Sender},
-        Arc, Mutex,
-    },
-    time::Duration,
+use std::sync::{
+    mpsc::{self, Sender},
+    Arc, Mutex,
 };
 
 use eframe::{
@@ -104,12 +101,32 @@ fn handle_midi_msg(emitter: Arc<Mutex<EmitterHandle>>, message: MidiMessage) {
                             ControlParam::Density => {
                                 handle.params.density.set_normalized(norm_value)
                             }
-                            ControlParam::GrainEnvelopeAmount => todo!(),
-                            ControlParam::GrainEnvelopeSkew => todo!(),
-                            ControlParam::NoteEnvelopeAttack => todo!(),
-                            ControlParam::NoteEnvelopeDecay => todo!(),
-                            ControlParam::NoteEnvelopeSustain => todo!(),
-                            ControlParam::NoteEnvelopeRelease => todo!(),
+                            ControlParam::GrainEnvelopeAmount => handle
+                                .params
+                                .grain_envelope
+                                .amount
+                                .set_normalized(norm_value),
+                            ControlParam::GrainEnvelopeSkew => {
+                                handle.params.grain_envelope.skew.set_normalized(norm_value)
+                            }
+                            ControlParam::NoteEnvelopeAttack => handle
+                                .params
+                                .note_envelope
+                                .attack
+                                .set_normalized(norm_value),
+                            ControlParam::NoteEnvelopeDecay => {
+                                handle.params.note_envelope.decay.set_normalized(norm_value)
+                            }
+                            ControlParam::NoteEnvelopeSustain => handle
+                                .params
+                                .note_envelope
+                                .sustain_level
+                                .set_normalized(norm_value),
+                            ControlParam::NoteEnvelopeRelease => handle
+                                .params
+                                .note_envelope
+                                .release
+                                .set_normalized(norm_value),
                             ControlParam::Transpose => {
                                 handle.params.transpose.set_normalized(norm_value)
                             }
