@@ -7,7 +7,10 @@ use std::{
 };
 
 use eframe::egui::{self, vec2, Color32, ComboBox, DragValue, Frame, Stroke, Ui};
-use midly::num::{u4, u7};
+use midly::{
+    num::{u4, u7},
+    MidiMessage,
+};
 use rodio::{OutputStream, OutputStreamHandle, Source};
 use strum::VariantArray;
 
@@ -67,6 +70,52 @@ impl NebulizerApp {
             active_panel: GuiPanel::Emitters,
             emitter: Arc::new(Mutex::new(EmitterHandle::default())),
             theme: catppuccin_egui::LATTE,
+        }
+    }
+}
+
+fn handle_midi_msg(emitter: Arc<Mutex<EmitterHandle>>, message: MidiMessage) {
+    let handle = &mut emitter.lock().unwrap();
+    if let Some(msg_sender) = &handle.msg_sender.clone() {
+        match message {
+            MidiMessage::NoteOn { key, vel } => {
+                let _ = msg_sender.send(EmitterMessage::NoteOn { key, vel });
+            }
+            MidiMessage::NoteOff { key, vel } => {
+                let _ = msg_sender.send(EmitterMessage::NoteOff { key, vel });
+            }
+            MidiMessage::Controller { controller, value } => {
+                let cc_map = handle.params.midi_cc_map.clone();
+                for (cc, param) in cc_map.iter() {
+                    if *cc == controller {
+                        match param {
+                            ControlParam::Position => {
+                                handle.params.position.set_from_midi_cc(value)
+                            }
+                            ControlParam::NumSlices => {
+                                handle.params.num_slices.set_from_midi_cc(value)
+                            }
+                            ControlParam::Spray => handle.params.spray.set_from_midi_cc(value),
+                            ControlParam::Length => handle.params.length.set_from_midi_cc(value),
+                            ControlParam::Density => handle.params.density.set_from_midi_cc(value),
+                            ControlParam::GrainEnvelopeAmount => todo!(),
+                            ControlParam::GrainEnvelopeSkew => todo!(),
+                            ControlParam::NoteEnvelopeAttack => todo!(),
+                            ControlParam::NoteEnvelopeDecay => todo!(),
+                            ControlParam::NoteEnvelopeSustain => todo!(),
+                            ControlParam::NoteEnvelopeRelease => todo!(),
+                            ControlParam::Transpose => {
+                                handle.params.transpose.set_from_midi_cc(value)
+                            }
+                            ControlParam::Amplitude => {
+                                handle.params.amplitude.set_from_midi_cc(value)
+                            }
+                        }
+                    }
+                }
+                let _ = msg_sender.send(EmitterMessage::Params(handle.params.clone()));
+            }
+            _ => {}
         }
     }
 }
@@ -322,14 +371,13 @@ fn settings_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             for port in app.midi_config.ports.clone().iter() {
                 ui.horizontal(|ui| {
                     ui.label(app.midi_config.midi_in.port_name(port).unwrap());
+
                     if ui.button("Connect").clicked() {
                         let handle = app.emitter.clone();
-                        let app_channel = app.midi_channel.clone();
+                        let midi_channel = app.midi_channel.clone();
                         app.midi_config.connect(port, move |channel, message| {
-                            if channel == *app_channel.lock().unwrap() {
-                                if let Some(sender) = &handle.lock().unwrap().msg_sender {
-                                    let _ = sender.send(EmitterMessage::Midi(message)).unwrap();
-                                }
+                            if channel == *midi_channel.lock().unwrap() {
+                                handle_midi_msg(handle.clone(), message);
                             }
                         });
                     }

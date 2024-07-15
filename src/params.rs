@@ -3,7 +3,10 @@ use std::{ops::RangeInclusive, time::Duration};
 use midly::num::u7;
 use strum_macros::{Display, VariantArray};
 
-use crate::envelope::{AdsrEnvelope, GrainEnvelope};
+use crate::{
+    envelope::{AdsrEnvelope, GrainEnvelope},
+    numeric::Numeric,
+};
 
 #[derive(Clone)]
 pub struct Parameter<I> {
@@ -11,12 +14,22 @@ pub struct Parameter<I> {
     pub range: RangeInclusive<I>,
 }
 
-impl<I> Parameter<I> {
+impl<I> Parameter<I>
+where
+    I: Numeric,
+{
     fn new(default: I, range: RangeInclusive<I>) -> Self {
         Self {
             value: default,
             range,
         }
+    }
+
+    pub fn set_from_midi_cc(&mut self, cc_value: u7) {
+        let normalized_value = cc_value.as_int() as f64 / 127.0;
+        let (min, max) = (self.range.start().to_f64(), self.range.end().to_f64());
+        let value_in_range = normalized_value * (max - min) + min;
+        self.value = I::from_f64(value_in_range);
     }
 }
 
@@ -101,7 +114,8 @@ pub enum ControlParam {
     GrainEnvelopeSkew,
     NoteEnvelopeAttack,
     NoteEnvelopeDecay,
-    NoteEnvelope,
+    NoteEnvelopeSustain,
+    NoteEnvelopeRelease,
     Transpose,
     Amplitude,
 }

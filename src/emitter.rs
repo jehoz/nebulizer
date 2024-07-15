@@ -64,8 +64,9 @@ impl Note {
 }
 
 pub enum EmitterMessage {
+    NoteOn { key: u7, vel: u7 },
+    NoteOff { key: u7, vel: u7 },
     Params(EmitterParams),
-    Midi(MidiMessage),
     Terminate,
 }
 
@@ -163,24 +164,21 @@ where
 
     fn handle_message(&mut self, msg: EmitterMessage) {
         match msg {
+            EmitterMessage::NoteOn { key, .. } => {
+                while self.params.polyphony < self.notes.len() as u32 + 1 {
+                    self.notes.pop_front();
+                }
+                self.notes
+                    .push_back(Note::new(key, self.params.note_envelope.clone()));
+            }
+            EmitterMessage::NoteOff { key, .. } => {
+                for note in self.notes.iter_mut() {
+                    if note.key == key {
+                        note.state = NoteState::Released(Duration::ZERO);
+                    }
+                }
+            }
             EmitterMessage::Params(settings) => self.params = settings,
-            EmitterMessage::Midi(midi_msg) => match midi_msg {
-                MidiMessage::NoteOn { key, .. } => {
-                    while self.params.polyphony < self.notes.len() as u32 + 1 {
-                        self.notes.pop_front();
-                    }
-                    self.notes
-                        .push_back(Note::new(key, self.params.note_envelope.clone()));
-                }
-                MidiMessage::NoteOff { key, .. } => {
-                    for note in self.notes.iter_mut() {
-                        if note.key == key {
-                            note.state = NoteState::Released(Duration::ZERO);
-                        }
-                    }
-                }
-                _ => {}
-            },
             EmitterMessage::Terminate => {
                 self.terminated = true;
             }
