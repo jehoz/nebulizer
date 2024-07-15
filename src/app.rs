@@ -22,7 +22,7 @@ use crate::{
     widgets::{
         envelope_plot::EnvelopePlot,
         parameter_knob::ParameterKnob,
-        waveform::{Waveform, WaveformData},
+        waveform::{GrainDrawData, Waveform, WaveformData},
     },
 };
 
@@ -30,6 +30,7 @@ pub struct EmitterHandle {
     pub track_name: String,
     pub params: EmitterParams,
     pub waveform: Option<WaveformData>,
+    pub grain_draw_data: Arc<Mutex<Vec<GrainDrawData>>>,
     pub msg_sender: Option<Sender<EmitterMessage>>,
 }
 
@@ -39,6 +40,7 @@ impl Default for EmitterHandle {
             track_name: "".to_string(),
             params: EmitterParams::default(),
             waveform: None,
+            grain_draw_data: Arc::new(Mutex::new(Vec::new())),
             msg_sender: None,
         }
     }
@@ -186,7 +188,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                 }
 
                 let (tx, rx) = mpsc::channel();
-                let emitter: Emitter<f32> = Emitter::new(&clip, rx);
+                let emitter: Emitter<f32> = Emitter::new(&clip, rx, handle.grain_draw_data.clone());
                 handle.track_name = path.file_name().unwrap().to_str().unwrap().to_string();
                 handle.waveform = Some(WaveformData::new(clip));
                 handle.msg_sender = Some(tx);
@@ -216,8 +218,9 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 
     let waveform_size = ui.available_width() * vec2(1.0, 0.25);
     if let Some(waveform) = &handle.waveform {
+        let draw_grains = handle.grain_draw_data.lock().unwrap().drain(..).collect();
         ui.add(
-            Waveform::new(waveform.clone())
+            Waveform::new(waveform.clone(), draw_grains)
                 .playheads(playheads)
                 .grain_length(handle.params.length.get())
                 .desired_size(waveform_size),

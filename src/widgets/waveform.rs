@@ -11,6 +11,13 @@ use crate::audio_clip::AudioClip;
 
 const WAVEFORM_RESOLUTION: usize = 216;
 
+pub struct GrainDrawData {
+    /// normalized position [0,1] along entire waveform
+    pub current_position: f32,
+    /// normalized progress [0,1] of own duration
+    pub current_progress: f32,
+}
+
 #[derive(Clone)]
 pub struct WaveformData {
     points: Box<[(f32, f32)]>,
@@ -53,15 +60,17 @@ pub struct Waveform {
     playheads: Vec<f32>,
     grain_length: Duration,
     desired_size: Option<Vec2>,
+    grains: Vec<GrainDrawData>,
 }
 
 impl Waveform {
-    pub fn new(data: WaveformData) -> Self {
+    pub fn new(data: WaveformData, grains: Vec<GrainDrawData>) -> Self {
         Self {
             data,
             playheads: Vec::new(),
             grain_length: Duration::ZERO,
             desired_size: None,
+            grains,
         }
     }
 
@@ -88,7 +97,8 @@ impl Widget for Waveform {
             .stroke(Stroke::new(1.0, ui.visuals().faint_bg_color))
             .show(ui, |ui| {
                 let waveform_color = ui.visuals().text_color();
-                let playhead_color = ui.visuals().selection.bg_fill;
+                let playhead_color = ui.visuals().selection.bg_fill.gamma_multiply(1.5);
+                let grain_color = playhead_color.to_opaque();
 
                 let desired_size = {
                     if let Some(size) = self.desired_size {
@@ -115,7 +125,7 @@ impl Widget for Waveform {
                             to_screen * pos2(*position, 1.0),
                             to_screen * pos2(*position, -1.0),
                         ],
-                        Stroke::new(1.0, playhead_color.to_opaque()),
+                        Stroke::new(1.0, playhead_color),
                     ));
                 }
 
@@ -144,10 +154,19 @@ impl Widget for Waveform {
                                 to_screen * pos2(end, -1.0),
                             ),
                             Rounding::ZERO,
-                            playhead_color,
+                            playhead_color.gamma_multiply(0.33),
                         ));
                     }
                 }
+
+                // draw representation of grains
+                for grain in self.grains.iter() {
+                    let pos = to_screen
+                        * pos2(grain.current_position, 1.0 - 2.0 * grain.current_progress);
+                    let dot = epaint::Shape::circle_filled(pos, 2.0, grain_color);
+                    shapes.push(dot);
+                }
+
                 ui.painter().extend(shapes)
             })
             .response

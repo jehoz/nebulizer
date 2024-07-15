@@ -1,15 +1,13 @@
 use midly::num::u7;
 use rand::{thread_rng, Rng};
 use rodio::cpal::{FromSample, Sample as CpalSample};
-use rodio::source::Amplify;
-use rodio::{
-    source::{Speed, UniformSourceIterator},
-    Sample, Source,
-};
+use rodio::{Sample, Source};
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 use std::{mem, sync::mpsc::Receiver, time::Duration};
 
 use crate::params::{EmitterParams, KeyMode};
+use crate::widgets::waveform::GrainDrawData;
 use crate::{audio_clip::AudioClip, envelope::AdsrEnvelope, grain::Grain};
 
 #[derive(PartialEq)]
@@ -70,8 +68,6 @@ pub enum EmitterMessage {
     Terminate,
 }
 
-type PitchedGrain<I> = UniformSourceIterator<Speed<Amplify<Grain<I>>>, I>;
-
 pub struct Emitter<I>
 where
     I: Sample,
@@ -82,9 +78,10 @@ where
     pub params: EmitterParams,
 
     msg_receiver: Receiver<EmitterMessage>,
-
+    /// used to communicate the state of currently playing grains back to GUI
+    grain_draw_data: Arc<Mutex<Vec<GrainDrawData>>>,
     notes: VecDeque<Note>,
-    grains: Vec<PitchedGrain<I>>,
+    grains: Vec<Grain<I>>,
 
     terminated: bool,
 }
@@ -93,7 +90,11 @@ impl<I> Emitter<I>
 where
     I: Sample,
 {
-    pub fn new(audio_clip: &AudioClip<I>, msg_receiver: Receiver<EmitterMessage>) -> Emitter<I>
+    pub fn new(
+        audio_clip: &AudioClip<I>,
+        msg_receiver: Receiver<EmitterMessage>,
+        grain_draw_data: Arc<Mutex<Vec<GrainDrawData>>>,
+    ) -> Emitter<I>
     where
         I: Sample,
     {
@@ -101,8 +102,9 @@ where
             audio_clip: audio_clip.clone(),
             current_audio_channel: 0,
             params: EmitterParams::default(),
-            msg_receiver,
 
+            msg_receiver,
+            grain_draw_data,
             notes: VecDeque::new(),
             grains: Vec::new(),
 
@@ -110,7 +112,7 @@ where
         }
     }
 
-    fn make_grain(&self, audio_clip: &AudioClip<I>, note: &Note) -> PitchedGrain<I> {
+    fn make_grain(&self, audio_clip: &AudioClip<I>, note: &Note) -> Grain<I> {
         let mut rng = thread_rng();
 
         let start = {
@@ -145,17 +147,13 @@ where
             KeyMode::Slice => interval_to_ratio(self.params.transpose.get()),
         };
 
-        UniformSourceIterator::new(
-            Grain::new(
-                audio_clip.clone(),
-                start,
-                self.params.length.get(),
-                self.params.grain_envelope.clone(),
-            )
-            .amplify(note.amplitude())
-            .speed(speed),
-            2,
-            audio_clip.sample_rate,
+        Grain::new(
+            audio_clip.clone(),
+            start,
+            self.params.length.get(),
+            speed,
+            note.amplitude(),
+            self.params.grain_envelope.clone(),
         )
     }
 
@@ -229,6 +227,14 @@ where
                 live_notes.push(note);
             }
             self.notes.extend(live_notes);
+
+            // only write new grain draw data when gui consumed the previous ones
+            let mut draw_grains = self.grain_draw_data.lock().unwrap();
+            if draw_grains.is_empty() {
+                for grain in self.grains.iter() {
+                    draw_grains.push(grain.draw());
+                }
+            }
         }
 
         let mut samples = vec![];
