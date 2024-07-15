@@ -82,18 +82,16 @@ fn draw_asdr_envelope(ui: &mut Ui, envelope: &AdsrEnvelope, rect: Rect) {
     let to_screen =
         emath::RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, 1.0..=0.0), rect);
 
-    let AdsrEnvelope {
-        attack,
-        decay,
-        sustain_level,
-        release,
-    } = envelope;
-    let total_sec = (*attack + *decay + *release).as_secs_f32();
+    let attack = envelope.attack.get();
+    let decay = envelope.decay.get();
+    let sustain_level = envelope.sustain_level.get();
+    let release = envelope.release.get();
+    let total_sec = (attack + decay + release).as_secs_f32();
 
     let points = vec![
         to_screen * pos2(0.0, 0.0),
         to_screen * pos2(attack.as_secs_f32() / total_sec, 1.0),
-        to_screen * pos2((*attack + *decay).as_secs_f32() / total_sec, *sustain_level),
+        to_screen * pos2((attack + decay).as_secs_f32() / total_sec, sustain_level),
         to_screen * pos2(1.0, 0.0),
     ];
 
