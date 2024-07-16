@@ -4,8 +4,10 @@ use std::sync::{
 };
 
 use eframe::{
-    egui::{self, vec2, Color32, ComboBox, DragValue, Frame, Stroke, Ui},
-    emath::Numeric,
+    egui::{
+        self, vec2, Align2, Color32, ComboBox, DragValue, FontId, Frame, Rect, RichText, Stroke, Ui,
+    },
+    emath::{Numeric, RectTransform},
 };
 use midly::{
     num::{u4, u7},
@@ -69,84 +71,15 @@ impl NebulizerApp {
             stream: (stream, stream_handle),
             midi_config: MidiConfig::new(),
             midi_channel: Arc::new(Mutex::new(u4::from(0))),
-            active_panel: GuiPanel::Emitters,
+            active_panel: GuiPanel::Main,
             emitter: Arc::new(Mutex::new(EmitterHandle::default())),
             theme: catppuccin_egui::LATTE,
         }
     }
 }
 
-fn handle_midi_msg(emitter: Arc<Mutex<EmitterHandle>>, message: MidiMessage) {
-    let handle = &mut emitter.lock().unwrap();
-    if let Some(msg_sender) = &handle.msg_sender.clone() {
-        match message {
-            MidiMessage::NoteOn { key, vel } => {
-                let _ = msg_sender.send(EmitterMessage::NoteOn { key, vel });
-            }
-            MidiMessage::NoteOff { key, vel } => {
-                let _ = msg_sender.send(EmitterMessage::NoteOff { key, vel });
-            }
-            MidiMessage::Controller { controller, value } => {
-                let cc_map = handle.params.midi_cc_map.clone();
-                let norm_value = value.as_int() as f64 / 127.0;
-                for (cc, param) in cc_map.iter() {
-                    if *cc == controller {
-                        match param {
-                            ControlParam::Position => {
-                                handle.params.position.set_normalized(norm_value)
-                            }
-                            ControlParam::NumSlices => {
-                                handle.params.num_slices.set_normalized(norm_value)
-                            }
-                            ControlParam::Spray => handle.params.spray.set_normalized(norm_value),
-                            ControlParam::Length => handle.params.length.set_normalized(norm_value),
-                            ControlParam::Density => {
-                                handle.params.density.set_normalized(norm_value)
-                            }
-                            ControlParam::GrainEnvelopeAmount => handle
-                                .params
-                                .grain_envelope
-                                .amount
-                                .set_normalized(norm_value),
-                            ControlParam::GrainEnvelopeSkew => {
-                                handle.params.grain_envelope.skew.set_normalized(norm_value)
-                            }
-                            ControlParam::NoteEnvelopeAttack => handle
-                                .params
-                                .note_envelope
-                                .attack
-                                .set_normalized(norm_value),
-                            ControlParam::NoteEnvelopeDecay => {
-                                handle.params.note_envelope.decay.set_normalized(norm_value)
-                            }
-                            ControlParam::NoteEnvelopeSustain => handle
-                                .params
-                                .note_envelope
-                                .sustain_level
-                                .set_normalized(norm_value),
-                            ControlParam::NoteEnvelopeRelease => handle
-                                .params
-                                .note_envelope
-                                .release
-                                .set_normalized(norm_value),
-                            ControlParam::Transpose => {
-                                handle.params.transpose.set_normalized(norm_value)
-                            }
-                            ControlParam::Amplitude => {
-                                handle.params.amplitude.set_normalized(norm_value)
-                            }
-                        }
-                    }
-                }
-                let _ = msg_sender.send(EmitterMessage::Params(handle.params.clone()));
-            }
-            _ => {}
-        }
-    }
-}
-
 enum GuiPanel {
-    Emitters,
+    Main,
     Settings,
 }
 
@@ -156,8 +89,8 @@ impl eframe::App for NebulizerApp {
 
         egui::TopBottomPanel::top("menu bar").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
-                if ui.button("Emitters").clicked() {
-                    self.active_panel = GuiPanel::Emitters;
+                if ui.button("Main").clicked() {
+                    self.active_panel = GuiPanel::Main;
                 }
 
                 if ui.button("Settings").clicked() {
@@ -167,7 +100,7 @@ impl eframe::App for NebulizerApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| match self.active_panel {
-            GuiPanel::Emitters => emitters_panel(self, ui),
+            GuiPanel::Main => emitters_panel(self, ui),
             GuiPanel::Settings => settings_panel(self, ui),
         });
 
@@ -178,33 +111,33 @@ impl eframe::App for NebulizerApp {
 fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
     let mut handle = app.emitter.lock().unwrap();
 
-    if ui.button("Load new sample").clicked() {
-        if let Some(path) = rfd::FileDialog::new().pick_file() {
-            // attempt to load and decode audio file
-            if let Some(clip) = AudioClip::<f32>::load_from_file(path.display().to_string()) {
-                // if overwriting existing emitter, terminate it first
-                if let Some(sender) = &handle.msg_sender {
-                    let _ = sender.send(EmitterMessage::Terminate).unwrap();
-                }
+    ui.horizontal(|ui| {
+        if ui.button(RichText::new("🗁").size(14.0)).clicked() {
+            if let Some(path) = rfd::FileDialog::new().pick_file() {
+                // attempt to load and decode audio file
+                if let Some(clip) = AudioClip::<f32>::load_from_file(path.display().to_string()) {
+                    // if overwriting existing emitter, terminate it first
+                    if let Some(sender) = &handle.msg_sender {
+                        let _ = sender.send(EmitterMessage::Terminate).unwrap();
+                    }
 
-                let (tx, rx) = mpsc::channel();
-                let emitter: Emitter<f32> = Emitter::new(&clip, rx, handle.grain_draw_data.clone());
-                handle.track_name = path.file_name().unwrap().to_str().unwrap().to_string();
-                handle.waveform = Some(WaveformData::new(clip));
-                handle.msg_sender = Some(tx);
-                let _ = app.stream.1.play_raw(emitter.convert_samples());
-            } else {
-                // TODO make some error popup window since this is only visible for one frame
-                ui.colored_label(Color32::RED, "Failed to read/decode audio file!");
+                    let (tx, rx) = mpsc::channel();
+                    let emitter: Emitter<f32> =
+                        Emitter::new(&clip, rx, handle.grain_draw_data.clone());
+                    handle.track_name = path.file_name().unwrap().to_str().unwrap().to_string();
+                    handle.waveform = Some(WaveformData::new(clip));
+                    handle.msg_sender = Some(tx);
+                    let _ = app.stream.1.play_raw(emitter.convert_samples());
+                } else {
+                    handle.track_name = "Failed to read/decode audio file!".to_string();
+                }
             }
         }
-    }
 
-    ui.separator();
-
-    ui.horizontal(|ui| {
-        ui.monospace(&handle.track_name);
+        ui.label(&handle.track_name);
     });
+
+    ui.add_space(4.0);
 
     let playheads = match handle.params.key_mode {
         KeyMode::Pitch => {
@@ -230,10 +163,18 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
             .fill(ui.visuals().extreme_bg_color)
             .stroke(Stroke::new(1.0, ui.visuals().faint_bg_color))
             .show(ui, |ui| {
-                let _ = ui.allocate_space(waveform_size);
-                ui.label("Load a sample :)")
+                let (_id, rect) = ui.allocate_space(waveform_size);
+                ui.painter().text(
+                    rect.center(),
+                    Align2::CENTER_CENTER,
+                    "No sample loaded",
+                    FontId::proportional(11.0),
+                    ui.visuals().text_color(),
+                );
             });
     }
+
+    ui.add_space(4.0);
 
     ui.horizontal(|ui| {
         ui.label("Polyphony");
@@ -307,6 +248,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.set_width(left_width);
+            ui.add_space(4.0);
             ui.add(
                 EnvelopePlot::from_adsr_envelope(&handle.params.note_envelope)
                     .set_height(plot_height),
@@ -335,6 +277,7 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         ui.separator();
 
         ui.vertical(|ui| {
+            ui.add_space(4.0);
             ui.set_width(right_width);
             ui.add(
                 EnvelopePlot::from_grain_envelope(&handle.params.grain_envelope)
@@ -362,10 +305,10 @@ fn emitters_panel(app: &mut NebulizerApp, ui: &mut Ui) {
 }
 
 fn settings_panel(app: &mut NebulizerApp, ui: &mut Ui) {
-    ui.label("MIDI Connection");
     match &app.midi_config.connection {
         Some((name, _conn)) => {
             let mut disconnect_clicked = false;
+            ui.label("MIDI Connection");
             ui.horizontal(|ui| {
                 ui.label(name);
                 disconnect_clicked = ui.button("Disconnect").clicked();
@@ -376,7 +319,8 @@ fn settings_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         }
         None => {
             ui.horizontal(|ui| {
-                if ui.button("Refresh").clicked() {
+                ui.label("MIDI Connection");
+                if ui.button("🔃").clicked() {
                     app.midi_config.refresh_ports();
                 }
             });
@@ -436,7 +380,7 @@ fn settings_panel(app: &mut NebulizerApp, ui: &mut Ui) {
                     }
                 });
 
-            if ui.button("X").clicked() {
+            if ui.button("🗙").clicked() {
                 to_delete = Some(e);
             }
         });
@@ -446,10 +390,79 @@ fn settings_panel(app: &mut NebulizerApp, ui: &mut Ui) {
         let _ = handle.params.midi_cc_map.remove(idx);
     }
 
-    if ui.button("+").clicked() {
+    if ui.button("➕").clicked() {
         handle
             .params
             .midi_cc_map
             .push((0.into(), ControlParam::Position));
+    }
+}
+
+fn handle_midi_msg(emitter: Arc<Mutex<EmitterHandle>>, message: MidiMessage) {
+    let handle = &mut emitter.lock().unwrap();
+    if let Some(msg_sender) = &handle.msg_sender.clone() {
+        match message {
+            MidiMessage::NoteOn { key, vel } => {
+                let _ = msg_sender.send(EmitterMessage::NoteOn { key, vel });
+            }
+            MidiMessage::NoteOff { key, vel } => {
+                let _ = msg_sender.send(EmitterMessage::NoteOff { key, vel });
+            }
+            MidiMessage::Controller { controller, value } => {
+                let cc_map = handle.params.midi_cc_map.clone();
+                let norm_value = value.as_int() as f64 / 127.0;
+                for (cc, param) in cc_map.iter() {
+                    if *cc == controller {
+                        match param {
+                            ControlParam::Position => {
+                                handle.params.position.set_normalized(norm_value)
+                            }
+                            ControlParam::NumSlices => {
+                                handle.params.num_slices.set_normalized(norm_value)
+                            }
+                            ControlParam::Spray => handle.params.spray.set_normalized(norm_value),
+                            ControlParam::Length => handle.params.length.set_normalized(norm_value),
+                            ControlParam::Density => {
+                                handle.params.density.set_normalized(norm_value)
+                            }
+                            ControlParam::GrainEnvelopeAmount => handle
+                                .params
+                                .grain_envelope
+                                .amount
+                                .set_normalized(norm_value),
+                            ControlParam::GrainEnvelopeSkew => {
+                                handle.params.grain_envelope.skew.set_normalized(norm_value)
+                            }
+                            ControlParam::NoteEnvelopeAttack => handle
+                                .params
+                                .note_envelope
+                                .attack
+                                .set_normalized(norm_value),
+                            ControlParam::NoteEnvelopeDecay => {
+                                handle.params.note_envelope.decay.set_normalized(norm_value)
+                            }
+                            ControlParam::NoteEnvelopeSustain => handle
+                                .params
+                                .note_envelope
+                                .sustain_level
+                                .set_normalized(norm_value),
+                            ControlParam::NoteEnvelopeRelease => handle
+                                .params
+                                .note_envelope
+                                .release
+                                .set_normalized(norm_value),
+                            ControlParam::Transpose => {
+                                handle.params.transpose.set_normalized(norm_value)
+                            }
+                            ControlParam::Amplitude => {
+                                handle.params.amplitude.set_normalized(norm_value)
+                            }
+                        }
+                    }
+                }
+                let _ = msg_sender.send(EmitterMessage::Params(handle.params.clone()));
+            }
+            _ => {}
+        }
     }
 }
