@@ -7,27 +7,42 @@ jobs:
     permissions: write-all
     name: release ${{ matrix.target }}
     strategy:
-      fail-fast: false
       matrix:
         include:
           - target: x86_64-pc-windows-gnu
-            os: ubuntu-latest
+            os: windows-latest
+            bin: nebulizer.exe
+            
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
+            bin: nebulizer
+            
           - target: x86_64-apple-darwin
             os: macos-latest
+            bin: nebulizer
+            
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@master
           
-      - name: Install deps
+      - name: Install ALSA
         run: sudo apt-get install -y alsa libasound2-dev
         if: contains(matrix.target, 'linux')
-        
-      - name: Compile and release
-        uses: rust-build/rust-build.action@v1.4.5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup toolchain
+        uses: actions-rs/toolchain@v1
         with:
-          RUSTTARGET: ${{ matrix.target }}
-          TOOLCHAIN_VERSION: 1.79
+          toolchain: 1.79
+          target: ${{ matrix.target }}
+        
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target-dir=/tmp
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.target }}
+          path: /tmp/release/${{ matrix.bin }}
