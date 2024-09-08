@@ -11,15 +11,15 @@ jobs:
         include:
           - target: x86_64-pc-windows-gnu
             os: windows-latest
-            bin: nebulizer.exe
+            ext: ".exe"
             
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
-            bin: nebulizer
+            ext: ""
             
           - target: x86_64-apple-darwin
             os: macos-latest
-            bin: nebulizer
+            ext: ""
             
     runs-on: ${{ matrix.os }}
     steps:
@@ -41,8 +41,12 @@ jobs:
           command: build
           args: --release --target-dir=/tmp
 
-      - name: Upload binary
-        uses: actions/upload-artifact@v3
+      - name: Upload release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: ${{ matrix.target }}
-          path: /tmp/release/${{ matrix.bin }}
+          upload_url: ${{ github.event.release.url }}
+          asset_path: /tmp/release/nebulizer${{ matrix.ext }}
+          asset_name: nebulizer-${{ matrix.target }}${{ matrix.ext }}
+          asset_content_type: application/octet-stream
